@@ -5,51 +5,76 @@
 <meta charset="UTF-8">
 <title>GAA Tactics Board</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-  body { margin:0; background:#2e7d32; }
-  #pitch {
-    width:100vw;
-    height:100vh;
-    position:relative;
-  }
-  svg {
-    position:absolute;
-    width:100%;
-    height:100%;
-  }
-  .player {
-    position:absolute;
-    width:40px;
-    height:40px;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:bold;
-    cursor:grab;
-    user-select:none;
-  }
-  .green { background:lime; color:black; }
-  .black { background:black; color:white; }
+body { margin:0; display:flex; font-family:Arial; }
+
+/* LEFT PANEL (players) */
+#sidebar {
+  width:20%;
+  background:#111;
+  display:flex;
+  flex-wrap:wrap;
+  padding:10px;
+}
+
+.player {
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:5px;
+  font-weight:bold;
+  cursor:grab;
+  user-select:none;
+}
+
+.green { background:lime; color:black; }
+.black { background:black; color:white; }
+
+/* RIGHT SIDE (pitch) */
+#pitch {
+  width:80%;
+  height:100vh;
+  background:#2e7d32;
+  position:relative;
+}
+
+svg {
+  position:absolute;
+  width:100%;
+  height:100%;
+}
 </style>
+
 </head>
 
 <body>
 
+<!-- LEFT: Player Bank -->
+
+<div id="sidebar"></div>
+
+<!-- RIGHT: Pitch -->
+
 <div id="pitch">
 
-<!-- GAA Pitch -->
-
 <svg>
+  <!-- Outer -->
   <rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" stroke="white" fill="none"/>
+
+  <!-- Halfway -->
+
   <line x1="50%" y1="20" x2="50%" y2="calc(100% - 20px)" stroke="white"/>
 
-  <!-- 45m lines -->
+  <!-- 45m -->
 
   <line x1="20" y1="25%" x2="calc(100% - 20px)" y2="25%" stroke="white"/>
   <line x1="20" y1="75%" x2="calc(100% - 20px)" y2="75%" stroke="white"/>
 
-  <!-- 21m lines -->
+  <!-- 21m -->
 
   <line x1="20" y1="35%" x2="calc(100% - 20px)" y2="35%" stroke="white"/>
   <line x1="20" y1="65%" x2="calc(100% - 20px)" y2="65%" stroke="white"/>
@@ -60,21 +85,32 @@
 
   <!-- Goals -->
 
-  <rect x="45%" y="20" width="10%" height="40" stroke="white" fill="none"/>
-  <rect x="45%" y="calc(100% - 60px)" width="10%" height="40" stroke="white" fill="none"/>
+  <rect x="48%" y="20" width="4%" height="40" stroke="white" fill="none"/>
+  <rect x="48%" y="calc(100% - 60px)" width="4%" height="40" stroke="white" fill="none"/>
+
+  <!-- Small squares -->
+
+  <rect x="45%" y="20" width="10%" height="80" stroke="white" fill="none"/>
+  <rect x="45%" y="calc(100% - 100px)" width="10%" height="80" stroke="white" fill="none"/>
+
+  <!-- 40m arcs -->
+
+  <path d="M 20 200 Q 50% 100  calc(100% - 20px) 200" stroke="white" fill="none"/>
+  <path d="M 20 calc(100% - 200px) Q 50% calc(100% - 100px) calc(100% - 20px) calc(100% - 200px)" stroke="white" fill="none"/>
+
 </svg>
 
 </div>
 
 <script>
+const sidebar = document.getElementById("sidebar");
 const pitch = document.getElementById("pitch");
 
-function createPlayer(x,y,color,num){
+// Create players in sidebar
+function createPlayer(color, num){
   const p = document.createElement("div");
   p.className = "player " + color;
   p.innerText = num;
-  p.style.left = x + "px";
-  p.style.top = y + "px";
 
   let offsetX, offsetY, dragging = false;
 
@@ -82,6 +118,7 @@ function createPlayer(x,y,color,num){
     dragging = true;
     offsetX = e.offsetX;
     offsetY = e.offsetY;
+    pitch.appendChild(p);
   });
 
   document.addEventListener("mouseup", ()=>{
@@ -90,18 +127,19 @@ function createPlayer(x,y,color,num){
 
   document.addEventListener("mousemove", (e)=>{
     if(dragging){
+      p.style.position = "absolute";
       p.style.left = (e.clientX - offsetX) + "px";
       p.style.top = (e.clientY - offsetY) + "px";
     }
   });
 
-  pitch.appendChild(p);
+  sidebar.appendChild(p);
 }
 
 // Teams
-for(let i=0;i<15;i++){
-  createPlayer(100 + (i%5)*100, 100 + Math.floor(i/5)*100, "green", i+1);
-  createPlayer(100 + (i%5)*100, 400 + Math.floor(i/5)*100, "black", i+1);
+for(let i=1;i<=15;i++){
+  createPlayer("green", i);
+  createPlayer("black", i);
 }
 </script>
 
