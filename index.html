@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>GAA Tactics Board PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { margin:0; font-family: Arial; background:#111; color:white; }
+    button { margin:4px; padding:6px 10px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const createTeam = (color, bench=false) =>
+  Array.from({ length: bench ? 5 : 15 }, (_, i) => ({
+    id: i+1,
+    x: bench ? 20 : 80 + (i%5)*120,
+    y: bench ? 50 + i*50 : 120 + Math.floor(i/5)*120,
+    color,
+    bench
+  }));
+
+function App(){
+  const [players,setPlayers]=useState([
+    ...createTeam("green"),
+    ...createTeam("black"),
+    ...createTeam("green",true),
+    ...createTeam("black",true)
+  ]);
+  const [ball,setBall]=useState({x:500,y:350});
+  const [drag,setDrag]=useState(null);
+  const [lines,setLines]=useState([]);
+  const [draw,setDraw]=useState(false);
+  const [current,setCurrent]=useState(null);
+  const [steps,setSteps]=useState([]);
+  const [speed,setSpeed]=useState(800);
+
+  const ref=useRef();
+
+  // persistence
+  useEffect(()=>{
+    const saved=localStorage.getItem("gaa-board");
+    if(saved){
+      const data=JSON.parse(saved);
+      setPlayers(data.players);
+      setBall(data.ball);
+      setLines(data.lines);
+    }
+  },[]);
+
+  useEffect(()=>{
+    localStorage.setItem("gaa-board",JSON.stringify({players,ball,lines}));
+  },[players,ball,lines]);
+
+  const pos=(e)=>{
+    const r=ref.current.getBoundingClientRect();
+    const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+    return {x,y};
+  };
+
+  const move=(e)=>{
+    if(draw){
+      const p=pos(e);
+      setCurrent(prev=>({...prev,x2:p.x,y2:p.y}));
+      return;
+    }
+    if(!drag) return;
+    const p=pos(e);
+
+    if(drag.type==="player"){
+      setPlayers(pl=>pl.map(x=>x===drag.obj?{...x,x:p.x,y:p.y}:x));
+    } else setBall(p);
+  };
+
+  const up=()=>{
+    if(draw && current){
+      setLines(l=>[...l,current]);
+      setDraw(false);
+      setCurrent(null);
+    }
+    setDrag(null);
+  };
+
+  const startDraw=(e)=>{
+    const p=pos(e);
+    setDraw(true);
+    setCurrent({x1:p.x,y1:p.y,x2:p.x,y2:p.y});
+  };
+
+  const addStep=()=> setSteps(s=>[...s,{players,ball}]);
+
+  const play=async()=>{
+    for(let s of steps){
+      setPlayers(s.players);
+      setBall(s.ball);
+      await new Promise(r=>setTimeout(r,speed));
+    }
+  };
+
+  const exportImg=()=>{
+    html2canvas(ref.current).then(c=>{
+      const a=document.createElement("a");
+      a.download="tactics.png";
+      a.href=c.toDataURL();
+      a.click();
+    });
+  };
+
+  return(
+    <div>
+      <div>
+        <button onClick={startDraw}>Draw</button>
+        <button onClick={addStep}>Add Step</button>
+        <button onClick={play}>Play</button>
+        <button onClick={()=>setSpeed(s=>Math.max(200,s-200))}>Faster</button>
+        <button onClick={()=>setSpeed(s=>s+200)}>Slower</button>
+        <button onClick={exportImg}>Export</button>
+      </div>
+
+      <div ref={ref}
+        style={{width:"100vw",height:"90vh",background:"#2e7d32",position:"relative"}}
+        onMouseMove={move} onTouchMove={move}
+        onMouseUp={up} onTouchEnd={up}>
+
+        <svg width="100%" height="100%" style={{position:"absolute"}}>
+          <rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" fill="none" stroke="white"/>
+          <line x1="50%" y1="20" x2="50%" y2="calc(100% - 20px)" stroke="white"/>
+
+          <!-- arcs -->
+          <path d="M 30 200 Q 500 100 970 200" stroke="white" fill="none"/>
+          <path d="M 30 600 Q 500 700 970 600" stroke="white" fill="none"/>
+
+          {lines.map((l,i)=>(
+            <g key={i}>
+              <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="yellow" strokeWidth="3"/>
+              <polygon points={l.x2+","+l.y2+" "+(l.x2-10)+","+(l.y2-5)+" "+(l.x2-10)+","+(l.y2+5)} fill="yellow"/>
+            </g>
+          ))}
+
+          {current && (
+            <line x1={current.x1} y1={current.y1} x2={current.x2} y2={current.y2} stroke="yellow" strokeWidth="3"/>
+          )}
+        </svg>
+
+        {players.map((p,i)=>(
+          <div key={i}
+            onMouseDown={()=>setDrag({type:"player",obj:p})}
+            onTouchStart={()=>setDrag({type:"player",obj:p})}
+            style={{
+              position:"absolute",left:p.x,top:p.y,
+              width:30,height:30,borderRadius:"50%",
+              background:p.color==="green"?"lime":"black",
+              color:p.color==="green"?"black":"white",
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:12
+            }}>{p.id}</div>
+        ))}
+
+        <div onMouseDown={()=>setDrag({type:"ball"})}
+          onTouchStart={()=>setDrag({type:"ball"})}
+          style={{position:"absolute",left:ball.x,top:ball.y,width:15,height:15,borderRadius:"50%",background:"white"}}/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+
+</body>
+</html>
