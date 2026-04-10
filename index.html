@@ -24,7 +24,7 @@ body { margin:0; display:flex; font-family:Arial; }
   display:flex; align-items:center; justify-content:center;
   margin:5px;
   font-weight:bold;
-  cursor:pointer;
+  cursor:grab;
   position:relative;
 }
 
@@ -40,11 +40,7 @@ body { margin:0; display:flex; font-family:Arial; }
   position:relative;
 }
 
-svg {
-  position:absolute;
-  width:100%;
-  height:100%;
-}
+svg { position:absolute; width:100%; height:100%; }
 
 /* toolbar */
 #toolbar {
@@ -67,9 +63,8 @@ svg {
   position:absolute;
   top:0;
   left:0;
-  width:100%;
-  height:100%;
   z-index:5;
+  pointer-events:none; /* 🔥 IMPORTANT FIX */
 }
 </style>
 
@@ -83,7 +78,6 @@ svg {
 
 <div id="toolbar">
   <button onclick="toggleDraw()">Draw</button>
-  <button onclick="undo()">Undo</button>
   <button onclick="clearDraw()">Clear</button>
 </div>
 
@@ -117,15 +111,15 @@ svg {
 <rect x="calc(100% - 50px)" y="45%" width="30" height="10%" stroke="white" fill="none"/>
 <rect x="calc(100% - 90px)" y="40%" width="70" height="20%" stroke="white" fill="none"/>
 
-<!-- SMALL D (20m arc) -->
+<!-- SMALL D -->
 
 <path d="M 90 40% A 60 60 0 0 1 90 60%" stroke="white" fill="none"/>
 <path d="M calc(100% - 90px) 40% A 60 60 0 0 0 calc(100% - 90px) 60%" stroke="white" fill="none"/>
 
-<!-- 40m ARC -->
+<!-- 40m ARC (cleaner) -->
 
-<path d="M 150 30% A 120 120 0 0 1 150 70%" stroke="white" fill="none"/>
-<path d="M calc(100% - 150px) 30% A 120 120 0 0 0 calc(100% - 150px) 70%" stroke="white" fill="none"/>
+<path d="M 150 30% A 180 180 0 0 1 150 70%" stroke="white" fill="none"/>
+<path d="M calc(100% - 150px) 30% A 180 180 0 0 0 calc(100% - 150px) 70%" stroke="white" fill="none"/>
 
 </svg>
 
@@ -135,7 +129,7 @@ svg {
 </div>
 
 <script>
-/* ---------- DRAG FIX ---------- */
+/* ---------- DRAG (FIXED) ---------- */
 const sidebar = document.getElementById("sidebar");
 
 function createPlayer(color, num){
@@ -146,8 +140,8 @@ function createPlayer(color, num){
   let dragging = false;
 
   p.addEventListener("mousedown", (e)=>{
+    e.stopPropagation(); // 🔥 stops drawing bug
     dragging = true;
-    p.style.position = "absolute";
     document.body.appendChild(p);
     move(e);
   });
@@ -157,6 +151,7 @@ function createPlayer(color, num){
 
   function move(e){
     if(!dragging) return;
+    p.style.position = "absolute";
     p.style.left = (e.pageX - 20) + "px";
     p.style.top = (e.pageY - 20) + "px";
   }
@@ -169,50 +164,43 @@ for(let i=1;i<=15;i++){
   createPlayer("blue", i);
 }
 
-/* ---------- DRAW FIX ---------- */
+/* ---------- DRAW (FIXED) ---------- */
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
+let drawMode = false;
 let drawing = false;
-let drawEnabled = false;
-let history = [];
 
 function toggleDraw(){
-  drawEnabled = !drawEnabled;
+  drawMode = !drawMode;
+  canvas.style.pointerEvents = drawMode ? "auto" : "none";
 }
 
 canvas.addEventListener("mousedown", e=>{
-  if(!drawEnabled) return;
+  if(!drawMode) return;
   drawing = true;
   ctx.beginPath();
-  ctx.moveTo(e.offsetX, e.offsetY);
+  ctx.moveTo(e.clientX, e.clientY);
 });
 
 canvas.addEventListener("mousemove", e=>{
   if(!drawing) return;
-  ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.lineTo(e.clientX, e.clientY);
   ctx.strokeStyle = "white";
   ctx.lineWidth = 3;
   ctx.stroke();
 });
 
-canvas.addEventListener("mouseup", ()=>{
-  if(drawing){
-    history.push(true);
-  }
-  drawing = false;
-});
-
-function undo(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  history.pop();
-}
+canvas.addEventListener("mouseup", ()=> drawing=false);
 
 function clearDraw(){
-  history = [];
   ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 </script>
