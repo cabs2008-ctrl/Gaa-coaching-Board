@@ -3,42 +3,51 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>GAA Tactics Board</title>
+<title>GAA Analyst Board</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body { margin:0; display:flex; font-family:Arial; }
 
-/* LEFT PANEL (players) */
+/* Sidebar */
 #sidebar {
   width:20%;
-  background:#111;
+  background:#0d0d0d;
+  padding:10px;
   display:flex;
   flex-wrap:wrap;
-  padding:10px;
 }
 
-.player {
-  width:40px;
-  height:40px;
+.player, .ball {
+  width:42px;
+  height:42px;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
   margin:5px;
+  font-size:12px;
   font-weight:bold;
   cursor:grab;
   user-select:none;
+  position:relative;
 }
 
-.green { background:lime; color:black; }
-.black { background:black; color:white; }
+.green { background:#00e676; color:black; }
+.blue { background:#2979ff; color:white; }
 
-/* RIGHT SIDE (pitch) */
+.ball {
+  background:white;
+  border:2px solid black;
+  width:22px;
+  height:22px;
+}
+
+/* Pitch */
 #pitch {
   width:80%;
   height:100vh;
-  background:#2e7d32;
+  background:linear-gradient(#2e7d32,#1b5e20);
   position:relative;
 }
 
@@ -47,101 +56,271 @@ svg {
   width:100%;
   height:100%;
 }
+
+/* Controls */
+#controls {
+  position:absolute;
+  top:10px;
+  right:10px;
+  background:rgba(0,0,0,0.6);
+  padding:8px;
+  border-radius:8px;
+}
+
+button {
+  margin:2px;
+  font-size:11px;
+}
+
+#savedList {
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  background:white;
+  padding:5px;
+  max-height:200px;
+  overflow:auto;
+}
 </style>
 
 </head>
 
 <body>
 
-<!-- LEFT: Player Bank -->
-
 <div id="sidebar"></div>
-
-<!-- RIGHT: Pitch -->
 
 <div id="pitch">
 
-<svg>
-  <!-- Outer -->
-  <rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" stroke="white" fill="none"/>
+<div id="controls">
+  <button onclick="undo()">Undo</button>
+  <button onclick="clearAll()">Clear</button>
+  <button onclick="resetPlayers()">Reset</button>
+  <button onclick="saveBoard()">Save</button>
+  <button onclick="exportPNG()">Export PNG</button>
+</div>
 
-  <!-- Halfway -->
+<div id="savedList"></div>
 
-  <line x1="50%" y1="20" x2="50%" y2="calc(100% - 20px)" stroke="white"/>
+<svg id="svgPitch">
 
-  <!-- 45m -->
+<!-- Pitch -->
 
-  <line x1="20" y1="25%" x2="calc(100% - 20px)" y2="25%" stroke="white"/>
-  <line x1="20" y1="75%" x2="calc(100% - 20px)" y2="75%" stroke="white"/>
+<rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" stroke="white" fill="none"/>
 
-  <!-- 21m -->
+<!-- Halfway -->
 
-  <line x1="20" y1="35%" x2="calc(100% - 20px)" y2="35%" stroke="white"/>
-  <line x1="20" y1="65%" x2="calc(100% - 20px)" y2="65%" stroke="white"/>
+<line x1="50%" y1="20" x2="50%" y2="calc(100% - 20px)" stroke="white"/>
 
-  <!-- Centre circle -->
+<!-- 45 -->
 
-  <circle cx="50%" cy="50%" r="60" stroke="white" fill="none"/>
+<line x1="25%" y1="20" x2="25%" y2="calc(100% - 20px)" stroke="white"/>
+<line x1="75%" y1="20" x2="75%" y2="calc(100% - 20px)" stroke="white"/>
 
-  <!-- Goals -->
+<!-- 21 -->
 
-  <rect x="48%" y="20" width="4%" height="40" stroke="white" fill="none"/>
-  <rect x="48%" y="calc(100% - 60px)" width="4%" height="40" stroke="white" fill="none"/>
+<line x1="35%" y1="20" x2="35%" y2="calc(100% - 20px)" stroke="white"/>
+<line x1="65%" y1="20" x2="65%" y2="calc(100% - 20px)" stroke="white"/>
 
-  <!-- Small squares -->
+<!-- Centre -->
 
-  <rect x="45%" y="20" width="10%" height="80" stroke="white" fill="none"/>
-  <rect x="45%" y="calc(100% - 100px)" width="10%" height="80" stroke="white" fill="none"/>
+<circle cx="50%" cy="50%" r="60" stroke="white" fill="none"/>
 
-  <!-- 40m arcs -->
+<!-- Goals -->
 
-  <path d="M 20 200 Q 50% 100  calc(100% - 20px) 200" stroke="white" fill="none"/>
-  <path d="M 20 calc(100% - 200px) Q 50% calc(100% - 100px) calc(100% - 20px) calc(100% - 200px)" stroke="white" fill="none"/>
+<rect x="20" y="45%" width="40" height="10%" stroke="white"/>
+<rect x="20" y="40%" width="80" height="20%" stroke="white"/>
+
+<rect x="calc(100% - 60px)" y="45%" width="40" height="10%" stroke="white"/>
+<rect x="calc(100% - 100px)" y="40%" width="80" height="20%" stroke="white"/>
+
+<!-- Arcs -->
+
+<path d="M 35% 20 A 200 200 0 0 0 35% calc(100% - 20px)" stroke="white" fill="none"/>
+<path d="M 65% 20 A 200 200 0 0 1 65% calc(100% - 20px)" stroke="white" fill="none"/>
+
+<g id="drawLayer"></g>
 
 </svg>
-
 </div>
 
 <script>
 const sidebar = document.getElementById("sidebar");
 const pitch = document.getElementById("pitch");
+const drawLayer = document.getElementById("drawLayer");
 
-// Create players in sidebar
+let players = [];
+let lines = [];
+
+// ---------- DRAG ----------
+function makeDraggable(el){
+  let dragging = false;
+
+  function start(e){
+    dragging = true;
+    document.body.appendChild(el);
+    el.style.position = "absolute";
+  }
+
+  function move(e){
+    if(!dragging) return;
+    let x = e.touches ? e.touches[0].pageX : e.pageX;
+    let y = e.touches ? e.touches[0].pageY : e.pageY;
+    el.style.left = x - 20 + "px";
+    el.style.top = y - 20 + "px";
+  }
+
+  function end(){ dragging = false; }
+
+  el.addEventListener("mousedown", start);
+  el.addEventListener("touchstart", start);
+
+  document.addEventListener("mousemove", move);
+  document.addEventListener("touchmove", move);
+
+  document.addEventListener("mouseup", end);
+  document.addEventListener("touchend", end);
+}
+
+// ---------- CREATE PLAYERS ----------
 function createPlayer(color, num){
   const p = document.createElement("div");
   p.className = "player " + color;
   p.innerText = num;
-
-  let offsetX, offsetY, dragging = false;
-
-  p.addEventListener("mousedown", (e)=>{
-    dragging = true;
-    offsetX = e.offsetX;
-    offsetY = e.offsetY;
-    pitch.appendChild(p);
-  });
-
-  document.addEventListener("mouseup", ()=>{
-    dragging = false;
-  });
-
-  document.addEventListener("mousemove", (e)=>{
-    if(dragging){
-      p.style.position = "absolute";
-      p.style.left = (e.clientX - offsetX) + "px";
-      p.style.top = (e.clientY - offsetY) + "px";
-    }
-  });
-
+  makeDraggable(p);
   sidebar.appendChild(p);
+  players.push(p);
 }
 
-// Teams
+// Ball
+const ball = document.createElement("div");
+ball.className = "ball";
+makeDraggable(ball);
+sidebar.appendChild(ball);
+players.push(ball);
+
+// ---------- DRAW ----------
+let drawing = false;
+let path;
+
+pitch.addEventListener("mousedown", startDraw);
+pitch.addEventListener("touchstart", startDraw);
+
+function startDraw(e){
+  drawing = true;
+  const rect = pitch.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+  path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("stroke","yellow");
+  path.setAttribute("fill","none");
+  path.setAttribute("stroke-width","3");
+
+  path.dataset.x = x;
+  path.dataset.y = y;
+
+  drawLayer.appendChild(path);
+  lines.push(path);
+}
+
+pitch.addEventListener("mousemove", drawMove);
+pitch.addEventListener("touchmove", drawMove);
+
+function drawMove(e){
+  if(!drawing) return;
+
+  const rect = pitch.getBoundingClientRect();
+  const x2 = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const y2 = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+  const x1 = path.dataset.x;
+  const y1 = path.dataset.y;
+
+  const cx = (x1 + x2)/2;
+  const cy = y1 - 60;
+
+  path.setAttribute("d", `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+}
+
+pitch.addEventListener("mouseup", ()=> drawing = false);
+pitch.addEventListener("touchend", ()=> drawing = false);
+
+// ---------- CONTROLS ----------
+function undo(){
+  const last = lines.pop();
+  if(last) last.remove();
+}
+
+function clearAll(){
+  lines.forEach(l => l.remove());
+  lines = [];
+}
+
+function resetPlayers(){
+  players.forEach(p => {
+    sidebar.appendChild(p);
+    p.style.position = "relative";
+    p.style.left = "";
+    p.style.top = "";
+  });
+}
+
+// ---------- SAVE MULTIPLE ----------
+function saveBoard(){
+  const name = prompt("Tactic name:");
+  if(!name) return;
+
+  const data = players.map(p => ({
+    left:p.style.left,
+    top:p.style.top
+  }));
+
+  let all = JSON.parse(localStorage.getItem("gaaBoards") || "[]");
+  all.push({name,data});
+  localStorage.setItem("gaaBoards", JSON.stringify(all));
+
+  loadList();
+}
+
+function loadList(){
+  const list = document.getElementById("savedList");
+  list.innerHTML = "";
+
+  let all = JSON.parse(localStorage.getItem("gaaBoards") || "[]");
+
+  all.forEach(b=>{
+    const btn = document.createElement("button");
+    btn.innerText = b.name;
+    btn.onclick = ()=>{
+      players.forEach((p,i)=>{
+        p.style.left = b.data[i].left;
+        p.style.top = b.data[i].top;
+      });
+    };
+    list.appendChild(btn);
+  });
+}
+
+// ---------- EXPORT PNG ----------
+function exportPNG(){
+  html2canvas(document.getElementById("pitch")).then(canvas=>{
+    const link = document.createElement("a");
+    link.download = "gaa-tactic.png";
+    link.href = canvas.toDataURL();
+    link.click();
+  });
+}
+
+// ---------- INIT ----------
 for(let i=1;i<=15;i++){
   createPlayer("green", i);
-  createPlayer("black", i);
+  createPlayer("blue", i);
 }
+
+loadList();
 </script>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 </body>
 </html>
