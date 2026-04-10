@@ -9,38 +9,41 @@
 <style>
 body { margin:0; display:flex; font-family:Arial; }
 
-#sidebar {
-  width:20%;
+/* LEFT: players */
+#sidebar{
+  width:18%;
   background:#111;
-  padding:10px;
+  padding:8px;
   display:flex;
   flex-wrap:wrap;
+  align-content:flex-start;
+}
+.player{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  margin:5px;font-weight:bold;cursor:grab;user-select:none;
+}
+.green{background:lime;color:black;}
+.blue{background:#2196f3;color:white;}
+
+/* RIGHT: pitch */
+#pitchWrap{ width:82%; position:relative; background:#2e7d32; }
+#pitch{ position:relative; width:100%; height:100vh; }
+svg{ position:absolute; width:100%; height:100%; }
+
+/* toolbar */
+#toolbar{
+  position:absolute; top:10px; right:10px; z-index:5;
+}
+#toolbar button{
+  margin-left:6px; padding:6px 10px; border:none; border-radius:4px;
+  background:#ffffffcc; cursor:pointer; font-weight:600;
 }
 
-.player {
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  margin:5px;
-  font-weight:bold;
-  cursor:grab;
+/* drawing layer */
+#drawLayer{
+  position:absolute; inset:0; pointer-events:none;
 }
-
-.green { background:lime; color:black; }
-.blue { background:#2196f3; color:white; }
-
-#pitch {
-  width:80%;
-  height:100vh;
-  background:#2e7d32;
-  position:relative;
-}
-
-svg { width:100%; height:100%; }
-text { fill:white; font-size:14px; }
 </style>
 
 </head>
@@ -49,99 +52,147 @@ text { fill:white; font-size:14px; }
 
 <div id="sidebar"></div>
 
-<div id="pitch">
+<div id="pitchWrap">
+  <div id="toolbar">
+    <button onclick="toggleDraw()">✏️ Draw</button>
+    <button onclick="undo()">Undo</button>
+    <button onclick="clearDraw()">Clear</button>
+    <button onclick="exportImg()">Export</button>
+  </div>
 
-<svg>
+  <div id="pitch">
+    <svg id="pitchSvg">
+      <!-- Outer -->
+      <rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" stroke="white" fill="none"/>
 
-  <!-- Outer -->
-
-  <rect x="20" y="20" width="calc(100% - 40px)" height="calc(100% - 40px)" stroke="white" fill="none"/>
-
+```
   <!-- Halfway -->
-
   <line x1="50%" y1="20" x2="50%" y2="calc(100% - 20px)" stroke="white"/>
 
-  <!-- 45m lines -->
+  <!-- ORDER from LEFT goal: 13m -> 20m -> 45m -->
+  <!-- Left side lines -->
+  <line x1="10%" y1="20" x2="10%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 13 -->
+  <line x1="18%" y1="20" x2="18%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 20 -->
+  <line x1="30%" y1="20" x2="30%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 45 -->
 
-  <line x1="25%" y1="20" x2="25%" y2="calc(100% - 20px)" stroke="white"/>
-  <line x1="75%" y1="20" x2="75%" y2="calc(100% - 20px)" stroke="white"/>
+  <!-- Right side lines (mirror) -->
+  <line x1="90%" y1="20" x2="90%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 13 -->
+  <line x1="82%" y1="20" x2="82%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 20 -->
+  <line x1="70%" y1="20" x2="70%" y2="calc(100% - 20px)" stroke="white"/>  <!-- 45 -->
 
-  <!-- 20m lines -->
-
-  <line x1="35%" y1="20" x2="35%" y2="calc(100% - 20px)" stroke="white"/>
-  <line x1="65%" y1="20" x2="65%" y2="calc(100% - 20px)" stroke="white"/>
-
-  <!-- 13m lines -->
-
-  <line x1="42%" y1="20" x2="42%" y2="calc(100% - 20px)" stroke="white"/>
-  <line x1="58%" y1="20" x2="58%" y2="calc(100% - 20px)" stroke="white"/>
-
-  <!-- LEFT GOAL -->
-
-  <line x1="20" y1="50%" x2="35" y2="50%" stroke="white"/>
-  <rect x="20" y="45%" width="35" height="10%" stroke="white" fill="none"/>
+  <!-- LEFT goal + squares -->
+  <rect x="20" y="45%" width="30" height="10%" stroke="white" fill="none"/>
   <rect x="20" y="40%" width="70" height="20%" stroke="white" fill="none"/>
 
-  <!-- RIGHT GOAL -->
-
-  <line x1="calc(100% - 20px)" y1="50%" x2="calc(100% - 35px)" y2="50%" stroke="white"/>
-  <rect x="calc(100% - 55px)" y="45%" width="35" height="10%" stroke="white" fill="none"/>
+  <!-- RIGHT goal -->
+  <rect x="calc(100% - 50px)" y="45%" width="30" height="10%" stroke="white" fill="none"/>
   <rect x="calc(100% - 90px)" y="40%" width="70" height="20%" stroke="white" fill="none"/>
 
-  <!-- SMALL D (20m semi-circle) -->
-
+  <!-- 20m D -->
   <path d="M 90 40% A 60 60 0 0 1 90 60%" stroke="white" fill="none"/>
   <path d="M calc(100% - 90px) 40% A 60 60 0 0 0 calc(100% - 90px) 60%" stroke="white" fill="none"/>
 
-  <!-- 40m arcs -->
-
+  <!-- 40m arc -->
   <path d="M 150 25% A 150 150 0 0 1 150 75%" stroke="white" fill="none"/>
   <path d="M calc(100% - 150px) 25% A 150 150 0 0 0 calc(100% - 150px) 75%" stroke="white" fill="none"/>
 
-  <!-- SIDELINE LABELS -->
+  <!-- labels -->
+  <text x="10%" y="18" fill="white">13</text>
+  <text x="18%" y="18" fill="white">20</text>
+  <text x="30%" y="18" fill="white">45</text>
 
-<text x="26%" y="18">45</text> <text x="36%" y="18">20</text> <text x="43%" y="18">13</text>
-
-<text x="74%" y="18">45</text> <text x="64%" y="18">20</text> <text x="57%" y="18">13</text>
-
+  <text x="88%" y="18" fill="white">13</text>
+  <text x="80%" y="18" fill="white">20</text>
+  <text x="70%" y="18" fill="white">45</text>
 </svg>
 
+<canvas id="drawLayer"></canvas>
+```
+
+  </div>
 </div>
 
 <script>
-const sidebar = document.getElementById("sidebar");
+/* players */
+const sidebar=document.getElementById("sidebar");
+function createPlayer(color,num){
+  const p=document.createElement("div");
+  p.className="player "+color;
+  p.innerText=num;
 
-function createPlayer(color, num){
-  const p = document.createElement("div");
-  p.className = "player " + color;
-  p.innerText = num;
-
-  let dragging = false;
-
-  p.addEventListener("mousedown", (e)=>{
-    dragging = true;
-    document.body.appendChild(p);
+  let drag=false;
+  p.onmousedown=e=>{
+    drag=true; document.body.appendChild(p);
     move(e);
-  });
-
-  document.addEventListener("mouseup", ()=> dragging=false);
-  document.addEventListener("mousemove", move);
+  };
+  document.onmouseup=()=>drag=false;
+  document.onmousemove=move;
 
   function move(e){
-    if(!dragging) return;
-    p.style.position = "absolute";
-    p.style.left = e.pageX - 20 + "px";
-    p.style.top = e.pageY - 20 + "px";
+    if(!drag)return;
+    p.style.position="absolute";
+    p.style.left=e.pageX-20+"px";
+    p.style.top=e.pageY-20+"px";
   }
 
   sidebar.appendChild(p);
 }
-
 for(let i=1;i<=15;i++){
-  createPlayer("green", i);
-  createPlayer("blue", i);
+  createPlayer("green",i);
+  createPlayer("blue",i);
+}
+
+/* drawing */
+const canvas=document.getElementById("drawLayer");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let drawing=false, enabled=false, paths=[];
+
+function toggleDraw(){ enabled=!enabled; }
+
+canvas.addEventListener("mousedown",e=>{
+  if(!enabled)return;
+  drawing=true;
+  ctx.beginPath();
+  ctx.moveTo(e.offsetX,e.offsetY);
+});
+
+canvas.addEventListener("mousemove",e=>{
+  if(!drawing)return;
+  ctx.lineTo(e.offsetX,e.offsetY);
+  ctx.strokeStyle="white";
+  ctx.lineWidth=3;
+  ctx.stroke();
+});
+
+canvas.addEventListener("mouseup",()=>{
+  if(drawing){ paths.push(true); }
+  drawing=false;
+});
+
+function undo(){
+  if(paths.length===0)return;
+  paths.pop();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function clearDraw(){
+  paths=[]; ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function exportImg(){
+  html2canvas(document.body).then(c=>{
+    const link=document.createElement("a");
+    link.download="tactic.png";
+    link.href=c.toDataURL();
+    link.click();
+  });
 }
 </script>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 </body>
 </html>
