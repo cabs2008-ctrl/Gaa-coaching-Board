@@ -8,7 +8,7 @@
 <style>
 body { margin:0; display:flex; font-family:sans-serif; }
 
-/* SIDEBAR */
+/* sidebar */
 #sidebar {
   width:140px;
   background:#111;
@@ -30,37 +30,15 @@ body { margin:0; display:flex; font-family:sans-serif; }
 .green { background:#4caf50; color:#000; }
 .blue { background:#2196f3; color:#fff; }
 
-/* PITCH */
+/* pitch */
 #pitchWrap {
   flex:1;
   position:relative;
   background:#2e7d32;
+  height:100vh;
 }
 
-/* LINES */
-.line {
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:2px;
-  background:white;
-  opacity:0.6;
-}
-
-/* GOAL BOX */
-.goal {
-  position:absolute;
-  border:2px solid white;
-}
-
-/* CANVAS */
-#canvas {
-  position:absolute;
-  top:0;
-  left:0;
-}
-
-/* TOOLBAR */
+/* toolbar */
 #toolbar {
   position:absolute;
   top:10px;
@@ -70,6 +48,13 @@ body { margin:0; display:flex; font-family:sans-serif; }
 button {
   margin-left:5px;
   padding:6px 10px;
+}
+
+/* canvas */
+#canvas {
+  position:absolute;
+  top:0;
+  left:0;
 }
 </style>
 
@@ -81,47 +66,52 @@ button {
 
 <div id="pitchWrap">
 
-<!-- TOOLBAR -->
-
 <div id="toolbar">
-  <button onclick="toggleDraw()">Draw</button>
+  <button onclick="drawMode = !drawMode">Draw</button>
   <button onclick="clearCanvas()">Clear</button>
 </div>
 
-<!-- GAA LINES -->
+<!-- PITCH -->
 
-<div class="line" style="left:10%"></div>
-<div class="line" style="left:18%"></div>
-<div class="line" style="left:30%"></div>
+<svg viewBox="0 0 1000 500" style="position:absolute; width:100%; height:100%;">
 
-<div class="line" style="left:70%"></div>
-<div class="line" style="left:82%"></div>
-<div class="line" style="left:90%"></div>
+  <!-- OUTER -->
 
-<!-- GOALS -->
+  <rect x="10" y="10" width="980" height="480" stroke="white" fill="none"/>
 
-<div class="goal" style="left:0; top:40%; width:80px; height:20%;"></div>
-<div class="goal" style="right:0; top:40%; width:80px; height:20%;"></div>
+  <!-- HALF -->
 
-<!-- GAA ARCS -->
+  <line x1="500" y1="10" x2="500" y2="490" stroke="white"/>
 
-<svg style="position:absolute; width:100%; height:100%; pointer-events:none;">
+  <!-- 13 / 20 / 45 -->
 
-  <!-- LEFT ARC -->
+  <line x1="150" y1="10" x2="150" y2="490" stroke="white"/>
+  <line x1="220" y1="10" x2="220" y2="490" stroke="white"/>
+  <line x1="320" y1="10" x2="320" y2="490" stroke="white"/>
 
-<path d="M 120 20% Q 260 50% 120 80%" 
-     stroke="white" fill="none" stroke-width="2"/>
+  <line x1="850" y1="10" x2="850" y2="490" stroke="white"/>
+  <line x1="780" y1="10" x2="780" y2="490" stroke="white"/>
+  <line x1="680" y1="10" x2="680" y2="490" stroke="white"/>
 
-  <!-- RIGHT ARC -->
+  <!-- GOALS -->
 
-<path d="M calc(100% - 120px) 20% 
-        Q calc(100% - 260px) 50% 
-        calc(100% - 120px) 80%" 
-     stroke="white" fill="none" stroke-width="2"/>
+  <rect x="10" y="200" width="40" height="100" stroke="white" fill="none"/>
+  <rect x="10" y="170" width="90" height="160" stroke="white" fill="none"/>
+
+  <rect x="950" y="200" width="40" height="100" stroke="white" fill="none"/>
+  <rect x="900" y="170" width="90" height="160" stroke="white" fill="none"/>
+
+  <!-- SMALL D -->
+
+  <path d="M 100 170 Q 200 250 100 330" stroke="white" fill="none"/>
+  <path d="M 900 170 Q 800 250 900 330" stroke="white" fill="none"/>
+
+  <!-- 40m ARC -->
+
+  <path d="M 180 120 Q 320 250 180 380" stroke="white" fill="none"/>
+  <path d="M 820 120 Q 680 250 820 380" stroke="white" fill="none"/>
 
 </svg>
-
-<!-- DRAW CANVAS -->
 
 <canvas id="canvas"></canvas>
 
@@ -132,7 +122,7 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const pitch = document.getElementById("pitchWrap");
 
-/* CANVAS SIZE FIX */
+/* ---------- FIX CANVAS SIZE ---------- */
 function resize(){
   canvas.width = pitch.clientWidth;
   canvas.height = pitch.clientHeight;
@@ -140,17 +130,14 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-/* DRAWING */
+/* ---------- DRAWING ---------- */
 let drawMode = false;
 let drawing = false;
-
-function toggleDraw(){
-  drawMode = !drawMode;
-}
 
 canvas.addEventListener("mousedown", e=>{
   if(!drawMode) return;
   drawing = true;
+
   const rect = canvas.getBoundingClientRect();
   ctx.beginPath();
   ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
@@ -158,6 +145,7 @@ canvas.addEventListener("mousedown", e=>{
 
 canvas.addEventListener("mousemove", e=>{
   if(!drawing) return;
+
   const rect = canvas.getBoundingClientRect();
   ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
   ctx.strokeStyle = "white";
@@ -167,12 +155,11 @@ canvas.addEventListener("mousemove", e=>{
 
 canvas.addEventListener("mouseup", ()=> drawing=false);
 
-/* CLEAR */
 function clearCanvas(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
-/* PLAYERS */
+/* ---------- PLAYERS ---------- */
 const sidebar = document.getElementById("sidebar");
 
 function makePlayer(color, num){
@@ -202,7 +189,6 @@ function makePlayer(color, num){
   sidebar.appendChild(p);
 }
 
-/* CREATE TEAMS */
 for(let i=1;i<=15;i++){
   makePlayer("green", i);
   makePlayer("blue", i);
