@@ -1,13 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GAA Tactics Board</title>
+
+<style>
+body {
+  margin: 0;
+  background: #111;
+  font-family: sans-serif;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+/* PLAYER PANEL */
+.sidebar {
+  width: 90px;
+  background: #0d0d0d;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.player {
+  width: 40px;
+  height: 40px;
+  margin: 8px auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  cursor: grab;
+}
+
+.green { background: #2ecc71; }
+.blue { background: #3498db; color: white; }
+
+/* PITCH */
+.pitch-container {
+  flex: 1;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  margin: auto;
+  background: linear-gradient(#2e7d32, #1b5e20);
+}
+
+/* TOOLBAR */
+.toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+button {
+  margin-left: 5px;
+  padding: 6px 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- PLAYERS -->
+  <div class="sidebar" id="players"></div>
+
+  <!-- PITCH -->
+  <div class="pitch-container">
+    <canvas id="pitch"></canvas>
+
+    <div class="toolbar">
+      <button onclick="mode='move'">Move</button>
+      <button onclick="mode='draw'">Draw</button>
+      <button onclick="undo()">Undo</button>
+      <button onclick="clearLines()">Clear</button>
+    </div>
+  </div>
+
+</div>
+
 <script>
-const canvas = document.querySelector("canvas");
+const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
 
-// FIX SIZE (important for scaling)
 canvas.width = 1000;
 canvas.height = 500;
 
+let mode = "move";
+let drawing = false;
+let lines = [];
+let currentLine = [];
+
+/* DRAW PITCH */
 function drawPitch() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const w = canvas.width;
   const h = canvas.height;
@@ -15,72 +108,135 @@ function drawPitch() {
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
 
-  // OUTER BORDER
-  ctx.strokeRect(0, 0, w, h);
+  // Border
+  ctx.strokeRect(0,0,w,h);
 
-  // GAA LINES (correct order from goal out)
-  const left13 = w * 0.13;
-  const left20 = w * 0.20;
-  const left45 = w * 0.45;
-
-  const right13 = w * 0.87;
-  const right20 = w * 0.80;
-  const right45 = w * 0.55;
-
-  [left13, left20, left45, right45, right20, right13].forEach(x => {
+  // GAA lines
+  const linesX = [0.13,0.20,0.45,0.55,0.80,0.87];
+  linesX.forEach(p=>{
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, h);
+    ctx.moveTo(w*p,0);
+    ctx.lineTo(w*p,h);
     ctx.stroke();
   });
 
-  // GOALS
-  drawGoal(0, false);
-  drawGoal(w, true);
+  drawGoal(0,false);
+  drawGoal(w,true);
 }
 
-function drawGoal(edgeX, isRight) {
+/* GOALS + ARCS */
+function drawGoal(edge, right) {
   const h = canvas.height;
-  const goalY = h / 2;
+  const y = h/2;
 
-  const bigW = 80;
-  const smallW = 40;
+  const big = 80;
+  const small = 40;
 
-  const x = isRight ? edgeX - bigW : edgeX;
+  const x = right ? edge-big : edge;
 
-  // BIG RECTANGLE
-  ctx.strokeRect(x, goalY - 100, bigW, 200);
+  ctx.strokeRect(x,y-100,big,200);
+  ctx.strokeRect(right?edge-small:edge,y-50,small,100);
 
-  // SMALL RECTANGLE
-  ctx.strokeRect(
-    isRight ? edgeX - smallW : edgeX,
-    goalY - 50,
-    smallW,
-    100
-  );
-
-  // SMALL D (semi circle)
+  // small D
   ctx.beginPath();
-  ctx.arc(
-    isRight ? x : x + bigW,
-    goalY,
-    40,
-    isRight ? -Math.PI / 2 : Math.PI / 2,
-    isRight ? Math.PI / 2 : (3 * Math.PI) / 2
-  );
+  ctx.arc(right?x:x+big,y,40,
+    right?-Math.PI/2:Math.PI/2,
+    right?Math.PI/2:1.5*Math.PI);
   ctx.stroke();
 
-  // 40m ARC (touching 20m line visually)
+  // 40m arc (correct size)
   ctx.beginPath();
-  ctx.arc(
-    isRight ? x : x + bigW,
-    goalY,
-    100,
-    isRight ? -Math.PI / 2 : Math.PI / 2,
-    isRight ? Math.PI / 2 : (3 * Math.PI) / 2
-  );
+  ctx.arc(right?x:x+big,y,100,
+    right?-Math.PI/2:Math.PI/2,
+    right?Math.PI/2:1.5*Math.PI);
   ctx.stroke();
 }
 
+/* DRAW LINES */
+canvas.addEventListener("mousedown",e=>{
+  if(mode==="draw"){
+    drawing=true;
+    currentLine=[];
+  }
+});
+
+canvas.addEventListener("mousemove",e=>{
+  if(drawing){
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentLine.push({x,y});
+    redraw();
+  }
+});
+
+canvas.addEventListener("mouseup",()=>{
+  if(drawing){
+    lines.push(currentLine);
+    drawing=false;
+  }
+});
+
+/* REDRAW EVERYTHING */
+function redraw(){
+  drawPitch();
+
+  ctx.strokeStyle="white";
+  ctx.lineWidth=3;
+
+  lines.forEach(line=>{
+    ctx.beginPath();
+    line.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
+  });
+
+  if(currentLine.length){
+    ctx.beginPath();
+    currentLine.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
+  }
+}
+
+/* UNDO */
+function undo(){
+  lines.pop();
+  redraw();
+}
+
+/* CLEAR */
+function clearLines(){
+  lines=[];
+  redraw();
+}
+
+/* PLAYERS */
+const container = document.getElementById("players");
+
+for(let i=1;i<=15;i++){
+  const p = document.createElement("div");
+  p.className = "player green";
+  p.textContent = i;
+  p.draggable = true;
+  container.appendChild(p);
+}
+
+for(let i=1;i<=15;i++){
+  const p = document.createElement("div");
+  p.className = "player blue";
+  p.textContent = i;
+  p.draggable = true;
+  container.appendChild(p);
+}
+
+/* INITIAL DRAW */
 drawPitch();
 </script>
+
+</body>
+</html>
