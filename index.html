@@ -1,70 +1,34 @@
 <!DOCTYPE html>
-
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GAA Tactics Board</title>
 
 <style>
-html, body {
-  margin:0;
-  height:100%;
-  overflow:hidden;
-  font-family:sans-serif;
-  background:#1b1b1b;
-}
+body { margin:0; display:flex; background:#111; color:white; font-family:sans-serif; }
 
-body {
-  display:flex;
-}
-
-/* sidebar */
 #sidebar {
-  width:160px;
-  background:#111;
+  width:120px;
+  background:#000;
   padding:10px;
-  display:flex;
-  flex-wrap:wrap;
-  align-content:flex-start;
-  overflow-y:auto;
 }
 
-/* players */
 .player {
-  width:38px;
-  height:38px;
+  width:40px;
+  height:40px;
   border-radius:50%;
+  margin:5px;
   display:flex;
   align-items:center;
   justify-content:center;
-  margin:4px;
   font-size:14px;
-  font-weight:bold;
   cursor:pointer;
 }
 
-.green { background:#4caf50; color:#000; }
-.blue { background:#2196f3; color:#fff; }
+.green { background:#2ecc71; }
+.blue { background:#3498db; }
 
-/* pitch */
-#pitchWrap {
-  flex:1;
-  position:relative;
-  height:100vh;
-  background:#2e7d32;
-}
-
-/* svg + canvas */
-svg, canvas {
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-}
-
-/* toolbar */
-#toolbar {
+#topbar {
   position:absolute;
   top:10px;
   right:10px;
@@ -72,193 +36,225 @@ svg, canvas {
 }
 
 button {
-  margin-left:5px;
+  margin:2px;
   padding:6px 10px;
-  border:none;
-  border-radius:4px;
-  cursor:pointer;
+}
+
+canvas {
+  flex:1;
+  background:#0b6623;
 }
 </style>
-
 </head>
 
 <body>
 
 <div id="sidebar"></div>
 
-<div id="pitchWrap">
-
-<div id="toolbar">
-  <button onclick="drawMode = !drawMode">Draw</button>
-  <button onclick="undo()">Undo</button>
-  <button onclick="clearCanvas()">Clear</button>
+<div id="topbar">
+  <button onclick="drawMode=true">Draw</button>
+  <button onclick="drawMode=false">Move</button>
+  <button onclick="undoLine()">Undo</button>
+  <button onclick="clearAll()">Clear</button>
+  <button onclick="savePlay()">Save</button>
+  <button onclick="loadPlay()">Load</button>
+  <button onclick="exportImage()">Export</button>
 </div>
 
-<!-- GAA PITCH -->
-
-<svg viewBox="0 0 1000 500">
-
-  <!-- OUTER -->
-
-  <rect x="10" y="10" width="980" height="480" stroke="white" fill="none"/>
-
-  <!-- HALF -->
-
-  <line x1="500" y1="10" x2="500" y2="490" stroke="white"/>
-
-  <!-- 13 / 20 / 45 -->
-
-  <line x1="150" y1="10" x2="150" y2="490" stroke="white"/>
-  <line x1="220" y1="10" x2="220" y2="490" stroke="white"/>
-  <line x1="320" y1="10" x2="320" y2="490" stroke="white"/>
-
-  <line x1="850" y1="10" x2="850" y2="490" stroke="white"/>
-  <line x1="780" y1="10" x2="780" y2="490" stroke="white"/>
-  <line x1="680" y1="10" x2="680" y2="490" stroke="white"/>
-
-  <!-- GOALS -->
-
-  <rect x="10" y="200" width="40" height="100" stroke="white" fill="none"/>
-  <rect x="10" y="170" width="90" height="160" stroke="white" fill="none"/>
-
-  <rect x="950" y="200" width="40" height="100" stroke="white" fill="none"/>
-  <rect x="900" y="170" width="90" height="160" stroke="white" fill="none"/>
-
-  <!-- SMALL D -->
-
-  <path d="M 100 170 Q 200 250 100 330" stroke="white" fill="none"/>
-  <path d="M 900 170 Q 800 250 900 330" stroke="white" fill="none"/>
-
-  <!-- 40m ARC (touching 20m line) -->
-
-  <path d="M 220 120 Q 360 250 220 380" stroke="white" fill="none"/>
-  <path d="M 780 120 Q 640 250 780 380" stroke="white" fill="none"/>
-
-</svg>
-
-<canvas id="canvas"></canvas>
-
-</div>
+<canvas id="pitch"></canvas>
 
 <script>
-/* ---------- CANVAS ---------- */
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
-const pitch = document.getElementById("pitchWrap");
 
-function resize(){
-  canvas.width = pitch.clientWidth;
-  canvas.height = pitch.clientHeight;
-}
-resize();
-window.addEventListener("resize", resize);
+canvas.width = window.innerWidth - 120;
+canvas.height = window.innerHeight;
 
-/* ---------- DRAW ---------- */
+let players = [];
+let drawings = [];
+let currentLine = [];
+
+let draggingPlayer = null;
 let drawMode = false;
-let drawing = false;
 
-let strokes = [];
-let currentStroke = [];
-
-canvas.addEventListener("mousedown", e=>{
-  if(!drawMode) return;
-
-  drawing = true;
-  currentStroke = [];
-
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-
-  currentStroke.push({x,y});
-});
-
-canvas.addEventListener("mousemove", e=>{
-  if(!drawing) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  ctx.lineTo(x, y);
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  currentStroke.push({x,y});
-});
-
-canvas.addEventListener("mouseup", ()=>{
-  if(drawing){
-    strokes.push(currentStroke);
-  }
-  drawing = false;
-});
-
-/* ---------- UNDO ---------- */
-function undo(){
-  strokes.pop();
-  redraw();
-}
-
-function redraw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  strokes.forEach(stroke=>{
-    ctx.beginPath();
-    stroke.forEach((p,i)=>{
-      if(i===0) ctx.moveTo(p.x,p.y);
-      else ctx.lineTo(p.x,p.y);
-    });
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-  });
-}
-
-/* ---------- CLEAR ---------- */
-function clearCanvas(){
-  strokes = [];
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-}
-
-/* ---------- PLAYERS ---------- */
+// -------- PLAYERS --------
 const sidebar = document.getElementById("sidebar");
 
-function makePlayer(color, num){
-  const p = document.createElement("div");
-  p.className = "player " + color;
-  p.innerText = num;
+for (let i = 1; i <= 15; i++) {
+  let p = document.createElement("div");
+  p.className = "player green";
+  p.innerText = i;
 
-  let dragging = false;
-
-  p.addEventListener("mousedown", e=>{
-    e.stopPropagation();
-    dragging = true;
-    document.body.appendChild(p);
-    move(e);
-  });
-
-  document.addEventListener("mousemove", move);
-  document.addEventListener("mouseup", ()=> dragging=false);
-
-  function move(e){
-    if(!dragging) return;
-    p.style.position = "absolute";
-    p.style.left = (e.pageX - 19) + "px";
-    p.style.top = (e.pageY - 19) + "px";
-  }
+  p.onclick = () => {
+    players.push({ id:i, x:200, y:100 + i*20 });
+    drawAll();
+  };
 
   sidebar.appendChild(p);
 }
 
-for(let i=1;i<=15;i++){
-  makePlayer("green", i);
-  makePlayer("blue", i);
+for (let i = 1; i <= 15; i++) {
+  let p = document.createElement("div");
+  p.className = "player blue";
+  p.innerText = i;
+
+  p.onclick = () => {
+    players.push({ id:i, x:300, y:100 + i*20 });
+    drawAll();
+  };
+
+  sidebar.appendChild(p);
 }
+
+// -------- SNAP --------
+const SNAP = 10;
+function snap(v){ return Math.round(v/SNAP)*SNAP; }
+
+// -------- DRAG --------
+canvas.addEventListener("mousedown", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (!drawMode) {
+    players.forEach(p => {
+      if (Math.hypot(p.x-x, p.y-y) < 20) {
+        draggingPlayer = p;
+      }
+    });
+  } else {
+    currentLine = [];
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (draggingPlayer) {
+    draggingPlayer.x = snap(x);
+    draggingPlayer.y = snap(y);
+    drawAll();
+  }
+
+  if (drawMode && e.buttons === 1) {
+    currentLine.push({x,y});
+    drawAll();
+  }
+});
+
+canvas.addEventListener("mouseup", () => {
+  if (draggingPlayer) draggingPlayer = null;
+
+  if (drawMode && currentLine.length) {
+    drawings.push(currentLine);
+  }
+});
+
+// -------- DRAW --------
+function drawAll(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawPitch();
+  drawLines();
+  drawPlayers();
+}
+
+// -------- PITCH (basic GA lines kept same) --------
+function drawPitch(){
+  ctx.strokeStyle="white";
+  ctx.lineWidth=2;
+
+  // border
+  ctx.strokeRect(0,0,canvas.width,canvas.height);
+
+  // lines
+  const lines = [0.2,0.3,0.5,0.7,0.8];
+  lines.forEach(l=>{
+    let x = canvas.width*l;
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  });
+
+  // goals
+  ctx.strokeRect(0, canvas.height/2-50, 80,100);
+  ctx.strokeRect(canvas.width-80, canvas.height/2-50, 80,100);
+}
+
+// -------- PLAYERS --------
+function drawPlayers(){
+  players.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,15,0,Math.PI*2);
+    ctx.fillStyle = "blue";
+    ctx.fill();
+
+    ctx.fillStyle="white";
+    ctx.fillText(p.id, p.x-5, p.y+5);
+  });
+}
+
+// -------- DRAWING --------
+function drawLines(){
+  ctx.strokeStyle="white";
+  ctx.lineWidth=3;
+
+  drawings.forEach(line=>{
+    ctx.beginPath();
+    line.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
+  });
+
+  ctx.beginPath();
+  currentLine.forEach((p,i)=>{
+    if(i===0) ctx.moveTo(p.x,p.y);
+    else ctx.lineTo(p.x,p.y);
+  });
+  ctx.stroke();
+}
+
+// -------- UNDO --------
+function undoLine(){
+  drawings.pop();
+  drawAll();
+}
+
+// -------- CLEAR --------
+function clearAll(){
+  drawings = [];
+  drawAll();
+}
+
+// -------- SAVE --------
+function savePlay(){
+  localStorage.setItem("gaaPlay", JSON.stringify({players, drawings}));
+  alert("Saved");
+}
+
+// -------- LOAD --------
+function loadPlay(){
+  let data = JSON.parse(localStorage.getItem("gaaPlay"));
+  if(!data) return;
+  players = data.players || [];
+  drawings = data.drawings || [];
+  drawAll();
+}
+
+// -------- EXPORT --------
+function exportImage(){
+  let link = document.createElement("a");
+  link.download = "gaa-play.png";
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+// init
+drawAll();
 </script>
 
 </body>
