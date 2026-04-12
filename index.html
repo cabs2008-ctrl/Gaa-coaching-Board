@@ -6,26 +6,41 @@
 <title>GAA Tactics Board</title>
 
 <style>
-body { margin:0; display:flex; font-family:sans-serif; }
+html, body {
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  font-family:sans-serif;
+  background:#1b1b1b;
+}
+
+body {
+  display:flex;
+}
 
 /* sidebar */
 #sidebar {
-  width:140px;
+  width:160px;
   background:#111;
   padding:10px;
   display:flex;
   flex-wrap:wrap;
+  align-content:flex-start;
+  overflow-y:auto;
 }
 
+/* players */
 .player {
-  width:36px; height:36px;
+  width:38px;
+  height:38px;
   border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   margin:4px;
   font-size:14px;
   font-weight:bold;
   cursor:pointer;
-  position:relative;
 }
 
 .green { background:#4caf50; color:#000; }
@@ -35,13 +50,17 @@ body { margin:0; display:flex; font-family:sans-serif; }
 #pitchWrap {
   flex:1;
   position:relative;
+  height:100vh;
   background:#2e7d32;
 }
 
-canvas {
+/* svg + canvas */
+svg, canvas {
   position:absolute;
   top:0;
   left:0;
+  width:100%;
+  height:100%;
 }
 
 /* toolbar */
@@ -51,9 +70,13 @@ canvas {
   right:10px;
   z-index:10;
 }
+
 button {
   margin-left:5px;
   padding:6px 10px;
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
 }
 </style>
 
@@ -71,9 +94,9 @@ button {
   <button onclick="clearCanvas()">Clear</button>
 </div>
 
-<!-- PITCH -->
+<!-- GAA PITCH -->
 
-<svg viewBox="0 0 1000 500" style="position:absolute; width:100%; height:100%;">
+<svg viewBox="0 0 1000 500">
 
   <!-- OUTER -->
 
@@ -225,8 +248,8 @@ function makePlayer(color, num){
   function move(e){
     if(!dragging) return;
     p.style.position = "absolute";
-    p.style.left = (e.pageX - 18) + "px";
-    p.style.top = (e.pageY - 18) + "px";
+    p.style.left = (e.pageX - 19) + "px";
+    p.style.top = (e.pageY - 19) + "px";
   }
 
   sidebar.appendChild(p);
