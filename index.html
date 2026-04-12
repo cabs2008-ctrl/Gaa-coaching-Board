@@ -5,256 +5,290 @@
 <title>GAA Tactics Board</title>
 
 <style>
-body { margin:0; display:flex; background:#111; color:white; font-family:sans-serif; }
+body {
+  margin: 0;
+  background: #111;
+  font-family: sans-serif;
+  overflow: hidden;
+}
 
-#sidebar {
-  width:120px;
-  background:#000;
-  padding:10px;
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 90px;
+  background: #0d0d0d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 5px;
+  overflow-y: auto;
 }
 
 .player {
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  margin:5px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:14px;
-  cursor:pointer;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  cursor: grab;
 }
 
-.green { background:#2ecc71; }
-.blue { background:#3498db; }
+.green { background: #2ecc71; color: #000; }
+.blue { background: #3498db; color: #fff; }
 
-#topbar {
-  position:absolute;
-  top:10px;
-  right:10px;
-  z-index:10;
-}
-
-button {
-  margin:2px;
-  padding:6px 10px;
+/* PITCH */
+.pitch-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 canvas {
-  flex:1;
-  background:#0b6623;
+  background: linear-gradient(#2e7d32, #1b5e20);
+  border: 2px solid white;
+}
+
+/* TOOLBAR */
+.toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+button {
+  margin-left: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<div id="sidebar"></div>
+<div class="container">
 
-<div id="topbar">
-  <button onclick="drawMode=true">Draw</button>
-  <button onclick="drawMode=false">Move</button>
-  <button onclick="undoLine()">Undo</button>
-  <button onclick="clearAll()">Clear</button>
-  <button onclick="savePlay()">Save</button>
-  <button onclick="loadPlay()">Load</button>
-  <button onclick="exportImage()">Export</button>
+<!-- PLAYERS -->
+<div class="sidebar" id="sidebar"></div>
+
+<!-- PITCH -->
+<div class="pitch-container">
+  <canvas id="pitch" width="1000" height="500"></canvas>
+
+  <div class="toolbar">
+    <button onclick="mode='draw'">Draw</button>
+    <button onclick="mode='move'">Move</button>
+    <button onclick="undo()">Undo</button>
+    <button onclick="clearDraw()">Clear</button>
+  </div>
 </div>
 
-<canvas id="pitch"></canvas>
+</div>
 
 <script>
 const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth - 120;
-canvas.height = window.innerHeight;
+let mode = "move";
+let drawing = false;
+let currentLine = [];
+let lines = [];
 
 let players = [];
-let drawings = [];
-let currentLine = [];
 
-let draggingPlayer = null;
-let drawMode = false;
-
-// -------- PLAYERS --------
+/* =========================
+   CREATE PLAYERS
+========================= */
 const sidebar = document.getElementById("sidebar");
 
 for (let i = 1; i <= 15; i++) {
-  let p = document.createElement("div");
-  p.className = "player green";
-  p.innerText = i;
-
-  p.onclick = () => {
-    players.push({ id:i, x:200, y:100 + i*20 });
-    drawAll();
-  };
-
-  sidebar.appendChild(p);
+  createPlayer(i, "green");
+  createPlayer(i, "blue");
 }
 
-for (let i = 1; i <= 15; i++) {
-  let p = document.createElement("div");
-  p.className = "player blue";
-  p.innerText = i;
+function createPlayer(num, color) {
+  const el = document.createElement("div");
+  el.className = "player " + color;
+  el.innerText = num;
 
-  p.onclick = () => {
-    players.push({ id:i, x:300, y:100 + i*20 });
-    drawAll();
-  };
+  el.onmousedown = (e) => startDrag(e, el);
 
-  sidebar.appendChild(p);
+  sidebar.appendChild(el);
 }
 
-// -------- SNAP --------
-const SNAP = 10;
-function snap(v){ return Math.round(v/SNAP)*SNAP; }
+/* =========================
+   DRAG SYSTEM (FIXED)
+========================= */
+let dragging = null;
 
-// -------- DRAG --------
-canvas.addEventListener("mousedown", (e) => {
+function startDrag(e, el) {
+  if (mode !== "move") return;
+
+  dragging = el;
+
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
 
-  if (!drawMode) {
-    players.forEach(p => {
-      if (Math.hypot(p.x-x, p.y-y) < 20) {
-        draggingPlayer = p;
-      }
-    });
-  } else {
-    currentLine = [];
-  }
-});
+  el.style.position = "absolute";
+  el.style.left = (e.clientX - rect.left - 20) + "px";
+  el.style.top = (e.clientY - rect.top - 20) + "px";
 
-canvas.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  if (draggingPlayer) {
-    draggingPlayer.x = snap(x);
-    draggingPlayer.y = snap(y);
-    drawAll();
-  }
-
-  if (drawMode && e.buttons === 1) {
-    currentLine.push({x,y});
-    drawAll();
-  }
-});
-
-canvas.addEventListener("mouseup", () => {
-  if (draggingPlayer) draggingPlayer = null;
-
-  if (drawMode && currentLine.length) {
-    drawings.push(currentLine);
-  }
-});
-
-// -------- DRAW --------
-function drawAll(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawPitch();
-  drawLines();
-  drawPlayers();
+  document.body.appendChild(el);
 }
 
-// -------- PITCH (basic GA lines kept same) --------
-function drawPitch(){
-  ctx.strokeStyle="white";
-  ctx.lineWidth=2;
+document.onmousemove = (e) => {
+  if (!dragging) return;
 
-  // border
-  ctx.strokeRect(0,0,canvas.width,canvas.height);
+  const rect = canvas.getBoundingClientRect();
 
-  // lines
-  const lines = [0.2,0.3,0.5,0.7,0.8];
-  lines.forEach(l=>{
-    let x = canvas.width*l;
+  dragging.style.left = (e.clientX - rect.left - 20) + "px";
+  dragging.style.top = (e.clientY - rect.top - 20) + "px";
+};
+
+document.onmouseup = () => {
+  dragging = null;
+};
+
+/* =========================
+   DRAW SYSTEM (FIXED)
+========================= */
+canvas.onmousedown = (e) => {
+  if (mode !== "draw") return;
+
+  drawing = true;
+  currentLine = [];
+
+  const pos = getMouse(e);
+  currentLine.push(pos);
+};
+
+canvas.onmousemove = (e) => {
+  if (!drawing) return;
+
+  const pos = getMouse(e);
+  currentLine.push(pos);
+
+  redraw();
+};
+
+canvas.onmouseup = () => {
+  if (!drawing) return;
+
+  drawing = false;
+  lines.push(currentLine);
+};
+
+/* FIXED mouse alignment */
+function getMouse(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+/* =========================
+   DRAW PITCH (GAA)
+========================= */
+function drawPitch() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // outer
+  ctx.strokeRect(0, 0, w, h);
+
+  // lines (correct order)
+  drawLine(0.13);
+  drawLine(0.20);
+  drawLine(0.45);
+  drawLine(1 - 0.45);
+  drawLine(1 - 0.20);
+  drawLine(1 - 0.13);
+
+  function drawLine(pos) {
     ctx.beginPath();
-    ctx.moveTo(x,0);
-    ctx.lineTo(x,canvas.height);
+    ctx.moveTo(w * pos, 0);
+    ctx.lineTo(w * pos, h);
     ctx.stroke();
-  });
+  }
 
   // goals
-  ctx.strokeRect(0, canvas.height/2-50, 80,100);
-  ctx.strokeRect(canvas.width-80, canvas.height/2-50, 80,100);
+  drawGoals(0);
+  drawGoals(w);
+
+  function drawGoals(x) {
+    const dir = x === 0 ? 1 : -1;
+
+    // small box
+    ctx.strokeRect(x, h/2 - 40, dir*60, 80);
+
+    // big box
+    ctx.strokeRect(x, h/2 - 80, dir*120, 160);
+
+    // semicircle (D)
+    ctx.beginPath();
+    ctx.arc(x + dir*120, h/2, 80, Math.PI/2, -Math.PI/2, x!==0);
+    ctx.stroke();
+
+    // 40m arc (touching 20m line)
+    ctx.beginPath();
+    ctx.arc(x + dir*(w*0.20), h/2, 120, Math.PI/2, -Math.PI/2, x!==0);
+    ctx.stroke();
+  }
 }
 
-// -------- PLAYERS --------
-function drawPlayers(){
-  players.forEach(p=>{
+/* =========================
+   DRAW LINES
+========================= */
+function redraw() {
+  drawPitch();
+
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "white";
+
+  lines.forEach(line => {
     ctx.beginPath();
-    ctx.arc(p.x,p.y,15,0,Math.PI*2);
-    ctx.fillStyle = "blue";
-    ctx.fill();
-
-    ctx.fillStyle="white";
-    ctx.fillText(p.id, p.x-5, p.y+5);
-  });
-}
-
-// -------- DRAWING --------
-function drawLines(){
-  ctx.strokeStyle="white";
-  ctx.lineWidth=3;
-
-  drawings.forEach(line=>{
-    ctx.beginPath();
-    line.forEach((p,i)=>{
-      if(i===0) ctx.moveTo(p.x,p.y);
-      else ctx.lineTo(p.x,p.y);
-    });
+    ctx.moveTo(line[0].x, line[0].y);
+    line.forEach(p => ctx.lineTo(p.x, p.y));
     ctx.stroke();
   });
 
-  ctx.beginPath();
-  currentLine.forEach((p,i)=>{
-    if(i===0) ctx.moveTo(p.x,p.y);
-    else ctx.lineTo(p.x,p.y);
-  });
-  ctx.stroke();
+  // current line
+  if (currentLine.length > 0) {
+    ctx.beginPath();
+    ctx.moveTo(currentLine[0].x, currentLine[0].y);
+    currentLine.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  }
 }
 
-// -------- UNDO --------
-function undoLine(){
-  drawings.pop();
-  drawAll();
+/* =========================
+   TOOLS
+========================= */
+function undo() {
+  lines.pop();
+  redraw();
 }
 
-// -------- CLEAR --------
-function clearAll(){
-  drawings = [];
-  drawAll();
+function clearDraw() {
+  lines = [];
+  redraw();
 }
 
-// -------- SAVE --------
-function savePlay(){
-  localStorage.setItem("gaaPlay", JSON.stringify({players, drawings}));
-  alert("Saved");
-}
-
-// -------- LOAD --------
-function loadPlay(){
-  let data = JSON.parse(localStorage.getItem("gaaPlay"));
-  if(!data) return;
-  players = data.players || [];
-  drawings = data.drawings || [];
-  drawAll();
-}
-
-// -------- EXPORT --------
-function exportImage(){
-  let link = document.createElement("a");
-  link.download = "gaa-play.png";
-  link.href = canvas.toDataURL();
-  link.click();
-}
-
-// init
-drawAll();
+/* INIT */
+drawPitch();
 </script>
 
 </body>
