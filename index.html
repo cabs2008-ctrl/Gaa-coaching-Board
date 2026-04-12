@@ -25,6 +25,7 @@ body { margin:0; display:flex; font-family:sans-serif; }
   font-size:14px;
   font-weight:bold;
   cursor:pointer;
+  position:relative;
 }
 
 .green { background:#4caf50; color:#000; }
@@ -35,7 +36,12 @@ body { margin:0; display:flex; font-family:sans-serif; }
   flex:1;
   position:relative;
   background:#2e7d32;
-  height:100vh;
+}
+
+canvas {
+  position:absolute;
+  top:0;
+  left:0;
 }
 
 /* toolbar */
@@ -49,13 +55,6 @@ button {
   margin-left:5px;
   padding:6px 10px;
 }
-
-/* canvas */
-#canvas {
-  position:absolute;
-  top:0;
-  left:0;
-}
 </style>
 
 </head>
@@ -68,6 +67,7 @@ button {
 
 <div id="toolbar">
   <button onclick="drawMode = !drawMode">Draw</button>
+  <button onclick="undo()">Undo</button>
   <button onclick="clearCanvas()">Clear</button>
 </div>
 
@@ -106,10 +106,10 @@ button {
   <path d="M 100 170 Q 200 250 100 330" stroke="white" fill="none"/>
   <path d="M 900 170 Q 800 250 900 330" stroke="white" fill="none"/>
 
-  <!-- 40m ARC -->
+  <!-- 40m ARC (touching 20m line) -->
 
-  <path d="M 180 120 Q 320 250 180 380" stroke="white" fill="none"/>
-  <path d="M 820 120 Q 680 250 820 380" stroke="white" fill="none"/>
+  <path d="M 220 120 Q 360 250 220 380" stroke="white" fill="none"/>
+  <path d="M 780 120 Q 640 250 780 380" stroke="white" fill="none"/>
 
 </svg>
 
@@ -118,11 +118,11 @@ button {
 </div>
 
 <script>
+/* ---------- CANVAS ---------- */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const pitch = document.getElementById("pitchWrap");
 
-/* ---------- FIX CANVAS SIZE ---------- */
 function resize(){
   canvas.width = pitch.clientWidth;
   canvas.height = pitch.clientHeight;
@@ -130,32 +130,75 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-/* ---------- DRAWING ---------- */
+/* ---------- DRAW ---------- */
 let drawMode = false;
 let drawing = false;
 
+let strokes = [];
+let currentStroke = [];
+
 canvas.addEventListener("mousedown", e=>{
   if(!drawMode) return;
+
   drawing = true;
+  currentStroke = [];
 
   const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
   ctx.beginPath();
-  ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+  ctx.moveTo(x, y);
+
+  currentStroke.push({x,y});
 });
 
 canvas.addEventListener("mousemove", e=>{
   if(!drawing) return;
 
   const rect = canvas.getBoundingClientRect();
-  ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  ctx.lineTo(x, y);
   ctx.strokeStyle = "white";
   ctx.lineWidth = 3;
   ctx.stroke();
+
+  currentStroke.push({x,y});
 });
 
-canvas.addEventListener("mouseup", ()=> drawing=false);
+canvas.addEventListener("mouseup", ()=>{
+  if(drawing){
+    strokes.push(currentStroke);
+  }
+  drawing = false;
+});
 
+/* ---------- UNDO ---------- */
+function undo(){
+  strokes.pop();
+  redraw();
+}
+
+function redraw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  strokes.forEach(stroke=>{
+    ctx.beginPath();
+    stroke.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+}
+
+/* ---------- CLEAR ---------- */
 function clearCanvas(){
+  strokes = [];
   ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
