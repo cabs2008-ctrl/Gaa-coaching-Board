@@ -1,106 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GAA Tactics Board</title>
-
-<style>
-body {
-  margin: 0;
-  background: #111;
-  font-family: sans-serif;
-}
-
-.container {
-  display: flex;
-  height: 100vh;
-}
-
-/* LEFT PLAYERS */
-.sidebar {
-  width: 90px;
-  background: #0d0d0d;
-  padding: 10px;
-  overflow-y: auto;
-}
-
-.player {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  margin: 6px auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  cursor: grab;
-}
-
-.green { background: #2ecc71; color: black; }
-.blue { background: #3498db; color: white; }
-
-/* PITCH */
-.pitch-container {
-  flex: 1;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-canvas {
-  background: linear-gradient(#2e7d32, #1b5e20);
-  border: 2px solid white;
-}
-
-/* TOOLBAR */
-.toolbar {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
-
-button {
-  margin-left: 5px;
-}
-</style>
-</head>
-
-<body>
-
-<div class="container">
-
-  <!-- PLAYERS -->
-  <div class="sidebar" id="players"></div>
-
-  <!-- PITCH -->
-  <div class="pitch-container">
-    <canvas id="pitch" width="1000" height="500"></canvas>
-
-    <div class="toolbar">
-      <button onclick="setMode('move')">Move</button>
-      <button onclick="setMode('draw')">Draw</button>
-      <button onclick="undo()">Undo</button>
-      <button onclick="clearLines()">Clear</button>
-    </div>
-  </div>
-
-</div>
-
 <script>
-const canvas = document.getElementById("pitch");
+const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-let mode = "move";
-let drawing = false;
-let lines = [];
-let currentLine = [];
+// FIX SIZE (important for scaling)
+canvas.width = 1000;
+canvas.height = 500;
 
-function setMode(m) {
-  mode = m;
-}
-
-/* DRAW PITCH */
 function drawPitch() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -110,159 +15,72 @@ function drawPitch() {
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
 
-  // Outer
+  // OUTER BORDER
   ctx.strokeRect(0, 0, w, h);
 
-  // Lines
-  const linesX = [0.13, 0.20, 0.45, 0.55, 0.80, 0.87];
-  linesX.forEach(p => {
+  // GAA LINES (correct order from goal out)
+  const left13 = w * 0.13;
+  const left20 = w * 0.20;
+  const left45 = w * 0.45;
+
+  const right13 = w * 0.87;
+  const right20 = w * 0.80;
+  const right45 = w * 0.55;
+
+  [left13, left20, left45, right45, right20, right13].forEach(x => {
     ctx.beginPath();
-    ctx.moveTo(w * p, 0);
-    ctx.lineTo(w * p, h);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
     ctx.stroke();
   });
 
-  drawGoal(100, h/2, false);
-  drawGoal(w-100, h/2, true);
+  // GOALS
+  drawGoal(0, false);
+  drawGoal(w, true);
 }
 
-function drawGoal(x, y, right) {
-  const big = 80;
-  const small = 40;
+function drawGoal(edgeX, isRight) {
+  const h = canvas.height;
+  const goalY = h / 2;
 
-  ctx.strokeRect(right ? x-big : x, y-100, big, 200);
-  ctx.strokeRect(right ? x-small : x, y-50, small, 100);
+  const bigW = 80;
+  const smallW = 40;
 
-  // D
+  const x = isRight ? edgeX - bigW : edgeX;
+
+  // BIG RECTANGLE
+  ctx.strokeRect(x, goalY - 100, bigW, 200);
+
+  // SMALL RECTANGLE
+  ctx.strokeRect(
+    isRight ? edgeX - smallW : edgeX,
+    goalY - 50,
+    smallW,
+    100
+  );
+
+  // SMALL D (semi circle)
   ctx.beginPath();
   ctx.arc(
-    right ? x-big : x+big,
-    y,
-    60,
-    right ? -Math.PI/2 : Math.PI/2,
-    right ? Math.PI/2 : Math.PI*1.5
+    isRight ? x : x + bigW,
+    goalY,
+    40,
+    isRight ? -Math.PI / 2 : Math.PI / 2,
+    isRight ? Math.PI / 2 : (3 * Math.PI) / 2
   );
   ctx.stroke();
 
-  // 40m arc
+  // 40m ARC (touching 20m line visually)
   ctx.beginPath();
   ctx.arc(
-    right ? x-big : x+big,
-    y,
-    120,
-    right ? -Math.PI/2 : Math.PI/2,
-    right ? Math.PI/2 : Math.PI*1.5
+    isRight ? x : x + bigW,
+    goalY,
+    100,
+    isRight ? -Math.PI / 2 : Math.PI / 2,
+    isRight ? Math.PI / 2 : (3 * Math.PI) / 2
   );
   ctx.stroke();
 }
 
-/* DRAW SAVED LINES */
-function drawLines() {
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 3;
-
-  lines.forEach(line => {
-    ctx.beginPath();
-    line.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
-  });
-}
-
-/* MOUSE DRAW */
-canvas.addEventListener("mousedown", e => {
-  if (mode !== "draw") return;
-
-  drawing = true;
-  currentLine = [];
-});
-
-canvas.addEventListener("mousemove", e => {
-  if (!drawing || mode !== "draw") return;
-
-  const rect = canvas.getBoundingClientRect();
-
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-  currentLine.push({x,y});
-
-  redraw();
-  drawLines();
-
-  ctx.beginPath();
-  currentLine.forEach((p,i)=>{
-    if(i===0) ctx.moveTo(p.x,p.y);
-    else ctx.lineTo(p.x,p.y);
-  });
-  ctx.stroke();
-});
-
-canvas.addEventListener("mouseup", () => {
-  if (drawing) {
-    lines.push(currentLine);
-    drawing = false;
-  }
-});
-
-/* UNDO */
-function undo() {
-  lines.pop();
-  redraw();
-}
-
-/* CLEAR */
-function clearLines() {
-  lines = [];
-  redraw();
-}
-
-/* REDRAW */
-function redraw() {
-  drawPitch();
-  drawLines();
-}
-
-/* PLAYERS */
-const playerBox = document.getElementById("players");
-
-for (let i = 1; i <= 15; i++) {
-  let p = document.createElement("div");
-  p.className = "player green";
-  p.innerText = i;
-
-  p.draggable = true;
-
-  p.addEventListener("dragstart", e => {
-    e.dataTransfer.setData("text", i);
-  });
-
-  playerBox.appendChild(p);
-}
-
-/* DROP PLAYERS */
-canvas.addEventListener("dragover", e => e.preventDefault());
-
-canvas.addEventListener("drop", e => {
-  const rect = canvas.getBoundingClientRect();
-
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-  ctx.fillStyle = "blue";
-  ctx.beginPath();
-  ctx.arc(x, y, 15, 0, Math.PI*2);
-  ctx.fill();
-
-  ctx.fillStyle = "white";
-  ctx.fillText(e.dataTransfer.getData("text"), x-5, y+5);
-});
-
-/* INITIAL DRAW */
 drawPitch();
 </script>
-
-</body>
-</html>
