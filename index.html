@@ -9,7 +9,6 @@ body {
   margin: 0;
   background: #111;
   font-family: sans-serif;
-  overflow: hidden;
 }
 
 .container {
@@ -17,14 +16,11 @@ body {
   height: 100vh;
 }
 
-/* SIDEBAR */
+/* LEFT PLAYERS */
 .sidebar {
   width: 90px;
   background: #0d0d0d;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 5px;
+  padding: 10px;
   overflow-y: auto;
 }
 
@@ -32,7 +28,7 @@ body {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  margin: 6px 0;
+  margin: 6px auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -40,8 +36,8 @@ body {
   cursor: grab;
 }
 
-.green { background: #2ecc71; color: #000; }
-.blue { background: #3498db; color: #fff; }
+.green { background: #2ecc71; color: black; }
+.blue { background: #3498db; color: white; }
 
 /* PITCH */
 .pitch-container {
@@ -66,8 +62,6 @@ canvas {
 
 button {
   margin-left: 5px;
-  padding: 6px 10px;
-  cursor: pointer;
 }
 </style>
 </head>
@@ -76,20 +70,20 @@ button {
 
 <div class="container">
 
-<!-- PLAYERS -->
-<div class="sidebar" id="sidebar"></div>
+  <!-- PLAYERS -->
+  <div class="sidebar" id="players"></div>
 
-<!-- PITCH -->
-<div class="pitch-container">
-  <canvas id="pitch" width="1000" height="500"></canvas>
+  <!-- PITCH -->
+  <div class="pitch-container">
+    <canvas id="pitch" width="1000" height="500"></canvas>
 
-  <div class="toolbar">
-    <button onclick="mode='draw'">Draw</button>
-    <button onclick="mode='move'">Move</button>
-    <button onclick="undo()">Undo</button>
-    <button onclick="clearDraw()">Clear</button>
+    <div class="toolbar">
+      <button onclick="setMode('move')">Move</button>
+      <button onclick="setMode('draw')">Draw</button>
+      <button onclick="undo()">Undo</button>
+      <button onclick="clearLines()">Clear</button>
+    </div>
   </div>
-</div>
 
 </div>
 
@@ -99,195 +93,174 @@ const ctx = canvas.getContext("2d");
 
 let mode = "move";
 let drawing = false;
-let currentLine = [];
 let lines = [];
+let currentLine = [];
 
-let players = [];
-
-/* =========================
-   CREATE PLAYERS
-========================= */
-const sidebar = document.getElementById("sidebar");
-
-for (let i = 1; i <= 15; i++) {
-  createPlayer(i, "green");
-  createPlayer(i, "blue");
+function setMode(m) {
+  mode = m;
 }
 
-function createPlayer(num, color) {
-  const el = document.createElement("div");
-  el.className = "player " + color;
-  el.innerText = num;
-
-  el.onmousedown = (e) => startDrag(e, el);
-
-  sidebar.appendChild(el);
-}
-
-/* =========================
-   DRAG SYSTEM (FIXED)
-========================= */
-let dragging = null;
-
-function startDrag(e, el) {
-  if (mode !== "move") return;
-
-  dragging = el;
-
-  const rect = canvas.getBoundingClientRect();
-
-  el.style.position = "absolute";
-  el.style.left = (e.clientX - rect.left - 20) + "px";
-  el.style.top = (e.clientY - rect.top - 20) + "px";
-
-  document.body.appendChild(el);
-}
-
-document.onmousemove = (e) => {
-  if (!dragging) return;
-
-  const rect = canvas.getBoundingClientRect();
-
-  dragging.style.left = (e.clientX - rect.left - 20) + "px";
-  dragging.style.top = (e.clientY - rect.top - 20) + "px";
-};
-
-document.onmouseup = () => {
-  dragging = null;
-};
-
-/* =========================
-   DRAW SYSTEM (FIXED)
-========================= */
-canvas.onmousedown = (e) => {
-  if (mode !== "draw") return;
-
-  drawing = true;
-  currentLine = [];
-
-  const pos = getMouse(e);
-  currentLine.push(pos);
-};
-
-canvas.onmousemove = (e) => {
-  if (!drawing) return;
-
-  const pos = getMouse(e);
-  currentLine.push(pos);
-
-  redraw();
-};
-
-canvas.onmouseup = () => {
-  if (!drawing) return;
-
-  drawing = false;
-  lines.push(currentLine);
-};
-
-/* FIXED mouse alignment */
-function getMouse(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (canvas.width / rect.width),
-    y: (e.clientY - rect.top) * (canvas.height / rect.height)
-  };
-}
-
-/* =========================
-   DRAW PITCH (GAA)
-========================= */
+/* DRAW PITCH */
 function drawPitch() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 2;
 
   const w = canvas.width;
   const h = canvas.height;
 
-  // outer
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+
+  // Outer
   ctx.strokeRect(0, 0, w, h);
 
-  // lines (correct order)
-  drawLine(0.13);
-  drawLine(0.20);
-  drawLine(0.45);
-  drawLine(1 - 0.45);
-  drawLine(1 - 0.20);
-  drawLine(1 - 0.13);
-
-  function drawLine(pos) {
+  // Lines
+  const linesX = [0.13, 0.20, 0.45, 0.55, 0.80, 0.87];
+  linesX.forEach(p => {
     ctx.beginPath();
-    ctx.moveTo(w * pos, 0);
-    ctx.lineTo(w * pos, h);
-    ctx.stroke();
-  }
-
-  // goals
-  drawGoals(0);
-  drawGoals(w);
-
-  function drawGoals(x) {
-    const dir = x === 0 ? 1 : -1;
-
-    // small box
-    ctx.strokeRect(x, h/2 - 40, dir*60, 80);
-
-    // big box
-    ctx.strokeRect(x, h/2 - 80, dir*120, 160);
-
-    // semicircle (D)
-    ctx.beginPath();
-    ctx.arc(x + dir*120, h/2, 80, Math.PI/2, -Math.PI/2, x!==0);
-    ctx.stroke();
-
-    // 40m arc (touching 20m line)
-    ctx.beginPath();
-    ctx.arc(x + dir*(w*0.20), h/2, 120, Math.PI/2, -Math.PI/2, x!==0);
-    ctx.stroke();
-  }
-}
-
-/* =========================
-   DRAW LINES
-========================= */
-function redraw() {
-  drawPitch();
-
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "white";
-
-  lines.forEach(line => {
-    ctx.beginPath();
-    ctx.moveTo(line[0].x, line[0].y);
-    line.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.moveTo(w * p, 0);
+    ctx.lineTo(w * p, h);
     ctx.stroke();
   });
 
-  // current line
-  if (currentLine.length > 0) {
-    ctx.beginPath();
-    ctx.moveTo(currentLine[0].x, currentLine[0].y);
-    currentLine.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-  }
+  drawGoal(100, h/2, false);
+  drawGoal(w-100, h/2, true);
 }
 
-/* =========================
-   TOOLS
-========================= */
+function drawGoal(x, y, right) {
+  const big = 80;
+  const small = 40;
+
+  ctx.strokeRect(right ? x-big : x, y-100, big, 200);
+  ctx.strokeRect(right ? x-small : x, y-50, small, 100);
+
+  // D
+  ctx.beginPath();
+  ctx.arc(
+    right ? x-big : x+big,
+    y,
+    60,
+    right ? -Math.PI/2 : Math.PI/2,
+    right ? Math.PI/2 : Math.PI*1.5
+  );
+  ctx.stroke();
+
+  // 40m arc
+  ctx.beginPath();
+  ctx.arc(
+    right ? x-big : x+big,
+    y,
+    120,
+    right ? -Math.PI/2 : Math.PI/2,
+    right ? Math.PI/2 : Math.PI*1.5
+  );
+  ctx.stroke();
+}
+
+/* DRAW SAVED LINES */
+function drawLines() {
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
+
+  lines.forEach(line => {
+    ctx.beginPath();
+    line.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+  });
+}
+
+/* MOUSE DRAW */
+canvas.addEventListener("mousedown", e => {
+  if (mode !== "draw") return;
+
+  drawing = true;
+  currentLine = [];
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (!drawing || mode !== "draw") return;
+
+  const rect = canvas.getBoundingClientRect();
+
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  currentLine.push({x,y});
+
+  redraw();
+  drawLines();
+
+  ctx.beginPath();
+  currentLine.forEach((p,i)=>{
+    if(i===0) ctx.moveTo(p.x,p.y);
+    else ctx.lineTo(p.x,p.y);
+  });
+  ctx.stroke();
+});
+
+canvas.addEventListener("mouseup", () => {
+  if (drawing) {
+    lines.push(currentLine);
+    drawing = false;
+  }
+});
+
+/* UNDO */
 function undo() {
   lines.pop();
   redraw();
 }
 
-function clearDraw() {
+/* CLEAR */
+function clearLines() {
   lines = [];
   redraw();
 }
 
-/* INIT */
+/* REDRAW */
+function redraw() {
+  drawPitch();
+  drawLines();
+}
+
+/* PLAYERS */
+const playerBox = document.getElementById("players");
+
+for (let i = 1; i <= 15; i++) {
+  let p = document.createElement("div");
+  p.className = "player green";
+  p.innerText = i;
+
+  p.draggable = true;
+
+  p.addEventListener("dragstart", e => {
+    e.dataTransfer.setData("text", i);
+  });
+
+  playerBox.appendChild(p);
+}
+
+/* DROP PLAYERS */
+canvas.addEventListener("dragover", e => e.preventDefault());
+
+canvas.addEventListener("drop", e => {
+  const rect = canvas.getBoundingClientRect();
+
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  ctx.fillStyle = "blue";
+  ctx.beginPath();
+  ctx.arc(x, y, 15, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = "white";
+  ctx.fillText(e.dataTransfer.getData("text"), x-5, y+5);
+});
+
+/* INITIAL DRAW */
 drawPitch();
 </script>
 
