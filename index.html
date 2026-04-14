@@ -87,6 +87,10 @@ canvas.height = 500;
 
 let mode = "move";
 
+/* ---------- SCALE ---------- */
+// Real pitch ≈ 145m → map to canvas width
+const scale = canvas.width / 145;
+
 /* ---------- PITCH ---------- */
 
 function drawPitch() {
@@ -101,16 +105,20 @@ function drawPitch() {
   // Outer
   ctx.strokeRect(0, 0, w, h);
 
-  // Correct GAA distances from each goal
-  const d13 = w * 0.13;
-  const d20 = w * 0.20;
-  const d45 = w * 0.45;
+  // REAL distances
+  const d13 = 13 * scale;
+  const d20 = 20 * scale;
+  const d45 = 45 * scale;
 
-  // Left side
-  [d13, d20, d45].forEach(x => drawLine(x));
+  // LEFT SIDE
+  drawLine(d13);
+  drawLine(d20);
+  drawLine(d45);
 
-  // Right side
-  [w - d13, w - d20, w - d45].forEach(x => drawLine(x));
+  // RIGHT SIDE
+  drawLine(w - d13);
+  drawLine(w - d20);
+  drawLine(w - d45);
 
   drawGoals();
   drawStoredLines();
@@ -133,26 +141,26 @@ function drawGoals() {
 function drawGoal(x, dir) {
   const mid = canvas.height / 2;
 
-  const big = 80;
-  const small = 40;
+  const small = 4.5 * scale;
+  const big = 13 * scale;
 
-  // Big box
-  ctx.strokeRect(x, mid - 100, dir * big, 200);
+  // Big rectangle (13m)
+  ctx.strokeRect(x, mid - 65, dir * big, 130);
 
-  // Small box
-  ctx.strokeRect(x, mid - 50, dir * small, 100);
+  // Small rectangle (4.5m)
+  ctx.strokeRect(x, mid - 30, dir * small, 60);
 
-  // D (semi circle)
+  // Small D
   ctx.beginPath();
-  ctx.arc(x + dir * big, mid, 35,
+  ctx.arc(x + dir * small, mid, 13 * scale,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
     dir === 1 ? 3*Math.PI/2 : Math.PI/2
   );
   ctx.stroke();
 
-  // 40m arc (centered on goal line)
+  // 20m arc (THIS is the key fix)
   ctx.beginPath();
-  ctx.arc(x, mid, 140,
+  ctx.arc(x, mid, 20 * scale,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
     dir === 1 ? 3*Math.PI/2 : Math.PI/2
   );
