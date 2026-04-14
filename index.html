@@ -86,7 +86,6 @@ function resizeCanvas() {
   canvas.height = canvas.clientHeight;
   drawPitch();
 }
-
 window.addEventListener("resize", resizeCanvas);
 
 /* ---------- PITCH ---------- */
@@ -94,78 +93,73 @@ window.addEventListener("resize", resizeCanvas);
 function drawPitch() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const margin = 40; // KEY FIX
-  const w = canvas.width - margin * 2;
+  const w = canvas.width;
   const h = canvas.height;
-
-  const startX = margin;
-  const endX = margin + w;
-
-  const midY = h / 2;
-
-  // scale to fit INSIDE margins
-  const scale = w / 145;
+  const mid = h / 2;
 
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
 
-  // Outer pitch
-  ctx.strokeRect(startX, 0, w, h);
+  // Outer
+  ctx.strokeRect(0, 0, w, h);
 
-  const d13 = 13 * scale;
-  const d20 = 20 * scale;
-  const d45 = 45 * scale;
+  // EVEN SPACING SYSTEM (THIS FIXES EVERYTHING)
+  const sections = 8;
+  const gap = w / sections;
 
-  // LEFT side
-  drawLine(startX + d13);
-  drawLine(startX + d20);
-  drawLine(startX + d45);
+  const lines = [
+    gap,        // 13
+    gap * 2,    // 20
+    gap * 3,    // 45
+    gap * 5,    // 45
+    gap * 6,    // 20
+    gap * 7     // 13
+  ];
 
-  // RIGHT side
-  drawLine(endX - d13);
-  drawLine(endX - d20);
-  drawLine(endX - d45);
+  lines.forEach(x => {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  });
 
-  drawGoals(startX, endX, midY, scale);
+  drawGoals(gap, mid);
   drawStoredLines();
-}
-
-function drawLine(x) {
-  ctx.beginPath();
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, canvas.height);
-  ctx.stroke();
 }
 
 /* ---------- GOALS ---------- */
 
-function drawGoals(startX, endX, midY, scale) {
-  drawGoal(startX, 1, midY, scale);
-  drawGoal(endX, -1, midY, scale);
+function drawGoals(gap, mid) {
+
+  // LEFT
+  drawGoal(0, 1, gap, mid);
+
+  // RIGHT
+  drawGoal(canvas.width, -1, gap, mid);
 }
 
-function drawGoal(x, dir, mid, scale) {
+function drawGoal(x, dir, gap, mid) {
 
-  const small = 4.5 * scale;
-  const big = 13 * scale;
+  const big = gap * 0.9;
+  const small = gap * 0.4;
 
   // Big box
-  ctx.strokeRect(x, mid - 65, dir * big, 130);
+  ctx.strokeRect(x, mid - 80, dir * big, 160);
 
   // Small box
-  ctx.strokeRect(x, mid - 30, dir * small, 60);
+  ctx.strokeRect(x, mid - 40, dir * small, 80);
 
   // Small D
   ctx.beginPath();
-  ctx.arc(x + dir * small, mid, 13 * scale,
+  ctx.arc(x + dir * small, mid, gap * 0.6,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
     dir === 1 ? 3*Math.PI/2 : Math.PI/2
   );
   ctx.stroke();
 
-  // 20m ARC (fixed + inside pitch)
+  // ARC (touches 20 line visually)
   ctx.beginPath();
-  ctx.arc(x, mid, 20 * scale,
+  ctx.arc(x, mid, gap * 2,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
     dir === 1 ? 3*Math.PI/2 : Math.PI/2
   );
