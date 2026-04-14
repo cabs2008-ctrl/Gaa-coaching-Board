@@ -10,7 +10,6 @@ body {
   display: flex;
   height: 100vh;
   background: #111;
-  font-family: sans-serif;
 }
 
 .sidebar {
@@ -54,11 +53,6 @@ canvas {
   top: 10px;
   right: 10px;
 }
-
-button {
-  margin-left: 5px;
-  padding: 6px 10px;
-}
 </style>
 </head>
 
@@ -70,8 +64,8 @@ button {
   <canvas id="pitch"></canvas>
 
   <div class="toolbar">
-    <button onclick="setMode('move')">Move</button>
-    <button onclick="setMode('draw')">Draw</button>
+    <button onclick="mode='move'">Move</button>
+    <button onclick="mode='draw'">Draw</button>
     <button onclick="undo()">Undo</button>
     <button onclick="clearLines()">Clear</button>
   </div>
@@ -88,186 +82,178 @@ function resizeCanvas() {
 }
 window.addEventListener("resize", resizeCanvas);
 
+let mode = "move";
+
 /* ---------- PITCH ---------- */
 
 function drawPitch() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const w = canvas.width;
   const h = canvas.height;
-  const mid = h / 2;
+  const midX = w / 2;
+  const midY = h / 2;
 
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
 
   // Outer
-  ctx.strokeRect(0, 0, w, h);
+  ctx.strokeRect(0,0,w,h);
 
-  // EVEN SPACING SYSTEM (THIS FIXES EVERYTHING)
-  const sections = 8;
-  const gap = w / sections;
+  // SCALE based on HALF pitch
+  const scale = (w/2) / 72.5;
 
-  const lines = [
-    gap,        // 13
-    gap * 2,    // 20
-    gap * 3,    // 45
-    gap * 5,    // 45
-    gap * 6,    // 20
-    gap * 7     // 13
-  ];
+  const d13 = 13 * scale;
+  const d20 = 20 * scale;
+  const d45 = 45 * scale;
 
-  lines.forEach(x => {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, h);
-    ctx.stroke();
-  });
+  // MIDFIELD (CRITICAL FIX)
+  drawLine(midX);
 
-  drawGoals(gap, mid);
+  // LEFT SIDE (from centre)
+  drawLine(midX - d45);
+  drawLine(midX - d20);
+  drawLine(midX - d13);
+
+  // RIGHT SIDE (mirror)
+  drawLine(midX + d45);
+  drawLine(midX + d20);
+  drawLine(midX + d13);
+
+  drawGoals(midX, midY, scale);
   drawStoredLines();
+}
+
+function drawLine(x) {
+  ctx.beginPath();
+  ctx.moveTo(x,0);
+  ctx.lineTo(x,canvas.height);
+  ctx.stroke();
 }
 
 /* ---------- GOALS ---------- */
 
-function drawGoals(gap, mid) {
+function drawGoals(midX, midY, scale) {
 
-  // LEFT
-  drawGoal(0, 1, gap, mid);
+  // LEFT goal at 0
+  drawGoal(0,1,midY,scale);
 
-  // RIGHT
-  drawGoal(canvas.width, -1, gap, mid);
+  // RIGHT goal at end
+  drawGoal(canvas.width,-1,midY,scale);
 }
 
-function drawGoal(x, dir, gap, mid) {
+function drawGoal(x,dir,mid,scale){
 
-  const big = gap * 0.9;
-  const small = gap * 0.4;
+  const small = 4.5 * scale;
+  const big = 13 * scale;
 
   // Big box
-  ctx.strokeRect(x, mid - 80, dir * big, 160);
+  ctx.strokeRect(x, mid-65, dir*big, 130);
 
   // Small box
-  ctx.strokeRect(x, mid - 40, dir * small, 80);
+  ctx.strokeRect(x, mid-30, dir*small, 60);
 
   // Small D
   ctx.beginPath();
-  ctx.arc(x + dir * small, mid, gap * 0.6,
-    dir === 1 ? Math.PI/2 : -Math.PI/2,
-    dir === 1 ? 3*Math.PI/2 : Math.PI/2
+  ctx.arc(x + dir*small, mid, 13*scale,
+    dir===1?Math.PI/2:-Math.PI/2,
+    dir===1?3*Math.PI/2:Math.PI/2
   );
   ctx.stroke();
 
-  // ARC (touches 20 line visually)
+  // 20m arc
   ctx.beginPath();
-  ctx.arc(x, mid, gap * 2,
-    dir === 1 ? Math.PI/2 : -Math.PI/2,
-    dir === 1 ? 3*Math.PI/2 : Math.PI/2
+  ctx.arc(x, mid, 20*scale,
+    dir===1?Math.PI/2:-Math.PI/2,
+    dir===1?3*Math.PI/2:Math.PI/2
   );
   ctx.stroke();
 }
 
 /* ---------- DRAW ---------- */
 
-let mode = "move";
-let drawing = false;
-let lines = [];
-let current = [];
+let drawing=false, lines=[], current=[];
 
-canvas.addEventListener("mousedown", e => {
-  if (mode !== "draw") return;
-  drawing = true;
-  current = [];
+canvas.addEventListener("mousedown",e=>{
+  if(mode!=="draw")return;
+  drawing=true;
+  current=[];
 });
 
-canvas.addEventListener("mousemove", e => {
-  if (!drawing) return;
+canvas.addEventListener("mousemove",e=>{
+  if(!drawing)return;
 
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left;
+  const y=e.clientY-r.top;
 
-  current.push({x, y});
+  current.push({x,y});
   drawPitch();
 
   ctx.beginPath();
-  current.forEach((p, i) => {
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
+  current.forEach((p,i)=>{
+    i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);
   });
   ctx.stroke();
 });
 
-canvas.addEventListener("mouseup", () => {
-  if (!drawing) return;
-  drawing = false;
+canvas.addEventListener("mouseup",()=>{
+  if(!drawing)return;
+  drawing=false;
   lines.push(current);
 });
 
-function drawStoredLines() {
-  lines.forEach(line => {
+function drawStoredLines(){
+  lines.forEach(line=>{
     ctx.beginPath();
-    line.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
+    line.forEach((p,i)=>{
+      i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);
     });
     ctx.stroke();
   });
 }
 
-function undo() {
-  lines.pop();
-  drawPitch();
-}
-
-function clearLines() {
-  lines = [];
-  drawPitch();
-}
+function undo(){ lines.pop(); drawPitch(); }
+function clearLines(){ lines=[]; drawPitch(); }
 
 /* ---------- PLAYERS ---------- */
 
-const sidebar = document.getElementById("players");
+const sidebar=document.getElementById("players");
 
-for (let i = 1; i <= 15; i++) {
-  sidebar.appendChild(makePlayer(i, "green"));
-  sidebar.appendChild(makePlayer(i, "blue"));
+for(let i=1;i<=15;i++){
+  sidebar.appendChild(makePlayer(i,"green"));
+  sidebar.appendChild(makePlayer(i,"blue"));
 }
 
-function makePlayer(num, color) {
-  const el = document.createElement("div");
-  el.className = "player " + color;
-  el.innerText = num;
+function makePlayer(num,color){
+  const el=document.createElement("div");
+  el.className="player "+color;
+  el.innerText=num;
 
-  let offsetX, offsetY;
+  let ox,oy;
 
-  el.addEventListener("mousedown", e => {
-    if (mode !== "move") return;
+  el.addEventListener("mousedown",e=>{
+    if(mode!=="move")return;
 
-    const rect = el.getBoundingClientRect();
-    offsetX = e.clientX - rect.left;
-    offsetY = e.clientY - rect.top;
+    const r=el.getBoundingClientRect();
+    ox=e.clientX-r.left;
+    oy=e.clientY-r.top;
 
-    el.style.position = "absolute";
+    el.style.position="absolute";
 
-    function move(ev) {
-      el.style.left = ev.pageX - offsetX + "px";
-      el.style.top = ev.pageY - offsetY + "px";
+    function move(ev){
+      el.style.left=ev.pageX-ox+"px";
+      el.style.top=ev.pageY-oy+"px";
     }
 
-    document.addEventListener("mousemove", move);
+    document.addEventListener("mousemove",move);
 
-    document.addEventListener("mouseup", () => {
-      document.removeEventListener("mousemove", move);
-    }, { once: true });
+    document.addEventListener("mouseup",()=>{
+      document.removeEventListener("mousemove",move);
+    },{once:true});
   });
 
   return el;
-}
-
-/* ---------- MODE ---------- */
-
-function setMode(m) {
-  mode = m;
 }
 
 /* ---------- INIT ---------- */
