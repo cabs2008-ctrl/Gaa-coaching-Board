@@ -40,14 +40,13 @@ body {
 .pitch-container {
   flex: 1;
   position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
   background: linear-gradient(#2e7d32, #1b5e20);
-  border: 2px solid white;
 }
 
 .toolbar {
@@ -82,14 +81,18 @@ button {
 const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 1000;
-canvas.height = 500;
+function resizeCanvas() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  drawPitch();
+}
 
-let mode = "move";
+window.addEventListener("resize", resizeCanvas);
 
 /* ---------- SCALE ---------- */
-// Real pitch ≈ 145m → map to canvas width
-const scale = canvas.width / 145;
+function getScale() {
+  return canvas.width / 145; // real pitch length
+}
 
 /* ---------- PITCH ---------- */
 
@@ -98,6 +101,9 @@ function drawPitch() {
 
   const w = canvas.width;
   const h = canvas.height;
+  const midY = h / 2;
+
+  const scale = getScale();
 
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
@@ -105,22 +111,21 @@ function drawPitch() {
   // Outer
   ctx.strokeRect(0, 0, w, h);
 
-  // REAL distances
   const d13 = 13 * scale;
   const d20 = 20 * scale;
   const d45 = 45 * scale;
 
-  // LEFT SIDE
+  // LEFT side (correct order)
   drawLine(d13);
   drawLine(d20);
   drawLine(d45);
 
-  // RIGHT SIDE
+  // RIGHT side (mirror)
   drawLine(w - d13);
   drawLine(w - d20);
   drawLine(w - d45);
 
-  drawGoals();
+  drawGoals(scale);
   drawStoredLines();
 }
 
@@ -133,21 +138,21 @@ function drawLine(x) {
 
 /* ---------- GOALS ---------- */
 
-function drawGoals() {
-  drawGoal(0, 1);
-  drawGoal(canvas.width, -1);
+function drawGoals(scale) {
+  drawGoal(0, 1, scale);
+  drawGoal(canvas.width, -1, scale);
 }
 
-function drawGoal(x, dir) {
+function drawGoal(x, dir, scale) {
   const mid = canvas.height / 2;
 
   const small = 4.5 * scale;
   const big = 13 * scale;
 
-  // Big rectangle (13m)
+  // Big rectangle
   ctx.strokeRect(x, mid - 65, dir * big, 130);
 
-  // Small rectangle (4.5m)
+  // Small rectangle
   ctx.strokeRect(x, mid - 30, dir * small, 60);
 
   // Small D
@@ -158,7 +163,7 @@ function drawGoal(x, dir) {
   );
   ctx.stroke();
 
-  // 20m arc (THIS is the key fix)
+  // 20m ARC (correct + touches 20m line)
   ctx.beginPath();
   ctx.arc(x, mid, 20 * scale,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
@@ -167,8 +172,9 @@ function drawGoal(x, dir) {
   ctx.stroke();
 }
 
-/* ---------- DRAW TOOL ---------- */
+/* ---------- DRAW ---------- */
 
+let mode = "move";
 let drawing = false;
 let lines = [];
 let current = [];
@@ -272,7 +278,7 @@ function setMode(m) {
 
 /* ---------- INIT ---------- */
 
-drawPitch();
+resizeCanvas();
 </script>
 
 </body>
