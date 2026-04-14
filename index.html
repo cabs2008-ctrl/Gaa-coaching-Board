@@ -46,7 +46,7 @@ canvas {
   width: 100%;
   height: 100%;
   display: block;
-  background: linear-gradient(#2e7d32, #1b5e20);
+  background: #1b5e20;
 }
 
 .toolbar {
@@ -89,70 +89,68 @@ function resizeCanvas() {
 
 window.addEventListener("resize", resizeCanvas);
 
-/* ---------- SCALE ---------- */
-function getScale() {
-  return canvas.width / 145; // real pitch length
-}
-
-/* ---------- PITCH ---------- */
+/* ---------- DRAW PITCH ---------- */
 
 function drawPitch() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const w = canvas.width;
-  const h = canvas.height;
-  const midY = h / 2;
+  const margin = 40;
 
-  const scale = getScale();
+  const pitchX = margin;
+  const pitchY = margin;
+  const pitchW = canvas.width - margin * 2;
+  const pitchH = canvas.height - margin * 2;
+
+  const scale = pitchW / 145; // real pitch length
 
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
 
-  // Outer
-  ctx.strokeRect(0, 0, w, h);
+  // Outer pitch
+  ctx.strokeRect(pitchX, pitchY, pitchW, pitchH);
 
   const d13 = 13 * scale;
   const d20 = 20 * scale;
   const d45 = 45 * scale;
 
-  // LEFT side (correct order)
-  drawLine(d13);
-  drawLine(d20);
-  drawLine(d45);
+  // LEFT
+  drawLine(pitchX + d13, pitchY, pitchH);
+  drawLine(pitchX + d20, pitchY, pitchH);
+  drawLine(pitchX + d45, pitchY, pitchH);
 
-  // RIGHT side (mirror)
-  drawLine(w - d13);
-  drawLine(w - d20);
-  drawLine(w - d45);
+  // RIGHT
+  drawLine(pitchX + pitchW - d13, pitchY, pitchH);
+  drawLine(pitchX + pitchW - d20, pitchY, pitchH);
+  drawLine(pitchX + pitchW - d45, pitchY, pitchH);
 
-  drawGoals(scale);
+  drawGoals(pitchX, pitchY, pitchW, pitchH, scale);
   drawStoredLines();
 }
 
-function drawLine(x) {
+function drawLine(x, y, h) {
   ctx.beginPath();
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, canvas.height);
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y + h);
   ctx.stroke();
 }
 
 /* ---------- GOALS ---------- */
 
-function drawGoals(scale) {
-  drawGoal(0, 1, scale);
-  drawGoal(canvas.width, -1, scale);
+function drawGoals(px, py, pw, ph, scale) {
+  drawGoal(px, py, ph, 1, scale);
+  drawGoal(px + pw, py, ph, -1, scale);
 }
 
-function drawGoal(x, dir, scale) {
-  const mid = canvas.height / 2;
+function drawGoal(x, py, ph, dir, scale) {
+  const mid = py + ph / 2;
 
   const small = 4.5 * scale;
   const big = 13 * scale;
 
-  // Big rectangle
+  // Big box
   ctx.strokeRect(x, mid - 65, dir * big, 130);
 
-  // Small rectangle
+  // Small box
   ctx.strokeRect(x, mid - 30, dir * small, 60);
 
   // Small D
@@ -163,7 +161,7 @@ function drawGoal(x, dir, scale) {
   );
   ctx.stroke();
 
-  // 20m ARC (correct + touches 20m line)
+  // 20m arc
   ctx.beginPath();
   ctx.arc(x, mid, 20 * scale,
     dir === 1 ? Math.PI/2 : -Math.PI/2,
