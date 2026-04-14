@@ -32,6 +32,8 @@ body {
   justify-content: center;
   font-weight: bold;
   cursor: grab;
+  position: relative;
+  z-index: 5;
 }
 
 .green { background: #2ecc71; }
@@ -53,6 +55,12 @@ canvas {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 10;
+}
+
+button {
+  margin-left: 5px;
+  padding: 6px 10px;
 }
 </style>
 </head>
@@ -65,8 +73,8 @@ canvas {
   <canvas id="pitch"></canvas>
 
   <div class="toolbar">
-    <button onclick="mode='move'">Move</button>
-    <button onclick="mode='draw'">Draw</button>
+    <button onclick="setMode('move')">Move</button>
+    <button onclick="setMode('draw')">Draw</button>
     <button onclick="undo()">Undo</button>
     <button onclick="clearLines()">Clear</button>
   </div>
@@ -76,14 +84,16 @@ canvas {
 const canvas = document.getElementById("pitch");
 const ctx = canvas.getContext("2d");
 
+let mode = "move";
+
+/* ---------- RESIZE ---------- */
+
 function resizeCanvas() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
   drawPitch();
 }
 window.addEventListener("resize", resizeCanvas);
-
-let mode = "move";
 
 /* ---------- PITCH ---------- */
 
@@ -100,21 +110,21 @@ function drawPitch() {
   // Outer
   ctx.strokeRect(0,0,w,h);
 
-  // SCALE (simple visual)
-  const scale = w / 100;
+  // SCALE (stable)
+  const scale = w / 120;
 
-  const line20 = 20 * scale;
-  const line30 = 30 * scale;
+  const bigBox = 30 * scale; // 30m line
+  const line20 = 20 * scale; // 20m line
 
-  // LEFT SIDE ONLY (mirror happens automatically visually)
+  // LEFT
+  drawLine(bigBox);
   drawLine(line20);
-  drawLine(line30);
 
-  // RIGHT SIDE
+  // RIGHT
+  drawLine(w - bigBox);
   drawLine(w - line20);
-  drawLine(w - line30);
 
-  drawGoals(scale, mid);
+  drawGoals(scale, mid, bigBox);
   drawStoredLines();
 }
 
@@ -127,24 +137,22 @@ function drawLine(x){
 
 /* ---------- GOALS ---------- */
 
-function drawGoals(scale, mid){
-
-  drawGoal(0,1,scale,mid);
-  drawGoal(canvas.width,-1,scale,mid);
+function drawGoals(scale, mid, bigBox){
+  drawGoal(0,1,scale,mid,bigBox);
+  drawGoal(canvas.width,-1,scale,mid,bigBox);
 }
 
-function drawGoal(x,dir,scale,mid){
+function drawGoal(x,dir,scale,mid,bigBox){
 
-  const small = 4 * scale;
-  const big = 14 * scale;
+  const small = 6 * scale;
 
-  // Big rectangle (your 30m zone)
-  ctx.strokeRect(x, mid-80, dir*big, 160);
+  // Big rectangle = 30m
+  ctx.strokeRect(x, mid-80, dir*bigBox, 160);
 
   // Small square
   ctx.strokeRect(x, mid-35, dir*small, 70);
 
-  // Semi circle
+  // Arc
   ctx.beginPath();
   ctx.arc(x + dir*small, mid, 12*scale,
     dir===1?Math.PI/2:-Math.PI/2,
@@ -223,6 +231,7 @@ function makePlayer(num,color){
     oy=e.clientY-r.top;
 
     el.style.position="absolute";
+    el.style.zIndex = 20;
 
     function move(ev){
       el.style.left=ev.pageX-ox+"px";
@@ -237,6 +246,12 @@ function makePlayer(num,color){
   });
 
   return el;
+}
+
+/* ---------- MODE ---------- */
+
+function setMode(m){
+  mode = m;
 }
 
 /* ---------- INIT ---------- */
