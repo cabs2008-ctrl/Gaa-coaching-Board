@@ -10,6 +10,7 @@ body {
   display: flex;
   height: 100vh;
   background: #111;
+  font-family: sans-serif;
 }
 
 .sidebar {
@@ -91,8 +92,7 @@ function drawPitch() {
 
   const w = canvas.width;
   const h = canvas.height;
-  const midX = w / 2;
-  const midY = h / 2;
+  const mid = h/2;
 
   ctx.strokeStyle = "white";
   ctx.lineWidth = 2;
@@ -100,31 +100,25 @@ function drawPitch() {
   // Outer
   ctx.strokeRect(0,0,w,h);
 
-  // SCALE based on HALF pitch
-  const scale = (w/2) / 72.5;
+  // SCALE (simple visual)
+  const scale = w / 100;
 
-  const d13 = 13 * scale;
-  const d20 = 20 * scale;
-  const d45 = 45 * scale;
+  const line20 = 20 * scale;
+  const line30 = 30 * scale;
 
-  // MIDFIELD (CRITICAL FIX)
-  drawLine(midX);
+  // LEFT SIDE ONLY (mirror happens automatically visually)
+  drawLine(line20);
+  drawLine(line30);
 
-  // LEFT SIDE (from centre)
-  drawLine(midX - d45);
-  drawLine(midX - d20);
-  drawLine(midX - d13);
+  // RIGHT SIDE
+  drawLine(w - line20);
+  drawLine(w - line30);
 
-  // RIGHT SIDE (mirror)
-  drawLine(midX + d45);
-  drawLine(midX + d20);
-  drawLine(midX + d13);
-
-  drawGoals(midX, midY, scale);
+  drawGoals(scale, mid);
   drawStoredLines();
 }
 
-function drawLine(x) {
+function drawLine(x){
   ctx.beginPath();
   ctx.moveTo(x,0);
   ctx.lineTo(x,canvas.height);
@@ -133,37 +127,26 @@ function drawLine(x) {
 
 /* ---------- GOALS ---------- */
 
-function drawGoals(midX, midY, scale) {
+function drawGoals(scale, mid){
 
-  // LEFT goal at 0
-  drawGoal(0,1,midY,scale);
-
-  // RIGHT goal at end
-  drawGoal(canvas.width,-1,midY,scale);
+  drawGoal(0,1,scale,mid);
+  drawGoal(canvas.width,-1,scale,mid);
 }
 
-function drawGoal(x,dir,mid,scale){
+function drawGoal(x,dir,scale,mid){
 
-  const small = 4.5 * scale;
-  const big = 13 * scale;
+  const small = 4 * scale;
+  const big = 14 * scale;
 
-  // Big box
-  ctx.strokeRect(x, mid-65, dir*big, 130);
+  // Big rectangle (your 30m zone)
+  ctx.strokeRect(x, mid-80, dir*big, 160);
 
-  // Small box
-  ctx.strokeRect(x, mid-30, dir*small, 60);
+  // Small square
+  ctx.strokeRect(x, mid-35, dir*small, 70);
 
-  // Small D
+  // Semi circle
   ctx.beginPath();
-  ctx.arc(x + dir*small, mid, 13*scale,
-    dir===1?Math.PI/2:-Math.PI/2,
-    dir===1?3*Math.PI/2:Math.PI/2
-  );
-  ctx.stroke();
-
-  // 20m arc
-  ctx.beginPath();
-  ctx.arc(x, mid, 20*scale,
+  ctx.arc(x + dir*small, mid, 12*scale,
     dir===1?Math.PI/2:-Math.PI/2,
     dir===1?3*Math.PI/2:Math.PI/2
   );
